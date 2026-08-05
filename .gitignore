@@ -1,0 +1,21 @@
+# Node dependencies & build outputs
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Python virtual environment & cache
+backend/venv/
+backend/__pycache__/
+*.pyc
+*.pyo
+
+# Local SQLite database & uploads
+backend/*.db
+backend/apc_attendance.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Environment variables & OS files
+.env
+.DS_Store
+Thumbs.db
