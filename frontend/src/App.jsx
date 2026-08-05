@@ -29,7 +29,8 @@ function ProtectedRoute({ children, allowedRoles }) {
   }
 
   // Handle forced password change redirect
-  if (user.mustChangePassword && !window.location.pathname.includes('/profile/change-password')) {
+  const isChangePasswordPage = window.location.hash.includes('/profile/change-password');
+  if (user.mustChangePassword && !isChangePasswordPage) {
     return <Navigate to="/profile/change-password?forced=1" replace />;
   }
 
