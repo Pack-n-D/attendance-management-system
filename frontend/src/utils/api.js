@@ -1,4 +1,9 @@
-const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api` : '/api';
+const DEFAULT_PROD_API = 'https://web-production-f5d6b.up.railway.app';
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api`
+  : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? '/api'
+    : `${DEFAULT_PROD_API}/api`;
 
 export async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem('apc_token');
