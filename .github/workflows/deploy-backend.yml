@@ -1,17 +1,11 @@
-name: Deploy Backend to Railway
+name: Deploy Backend to Railway (Optional CLI Trigger)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - 'Procfile'
-      - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
 jobs:
   deploy-railway:
+    if: "${{ secrets.RAILWAY_TOKEN != '' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
