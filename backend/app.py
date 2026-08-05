@@ -32,6 +32,46 @@ def create_app():
     app.register_blueprint(attendance_bp)
     app.register_blueprint(settings_bp)
 
+    # Ensure database tables and initial Super Admin exist on startup
+    with app.app_context():
+        db.create_all()
+        from models import Employee, AttendanceRule
+        from werkzeug.security import generate_password_hash
+        try:
+            if not Employee.query.filter_by(role='super_admin').first():
+                admin = Employee(
+                    id='SUPERADMIN01',
+                    first_name='APC',
+                    last_name='Admin',
+                    phone='+1 800-555-0199',
+                    email='admin@apc.com',
+                    dob='1990-01-01',
+                    date_of_joining='2020-01-01',
+                    designation='Platform Super Admin',
+                    department='Management',
+                    employment_type='Full-time',
+                    role='super_admin',
+                    status='active',
+                    password_hash=generate_password_hash('Admin@123'),
+                    must_change_password=False,
+                    created_by='Auto Init'
+                )
+                db.session.add(admin)
+                if not AttendanceRule.query.first():
+                    rule = AttendanceRule(
+                        ideal_punch_in_time='09:30',
+                        ideal_punch_out_time='18:30',
+                        buffer_minutes_in=15,
+                        buffer_minutes_out=15,
+                        weekly_offs='Saturday,Sunday',
+                        half_day_threshold_in='12:00'
+                    )
+                    db.session.add(rule)
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Auto-init warning: {e}")
+
     # Serve static uploaded files
     @app.route('/uploads/<path:filename>')
     def uploaded_file(filename):
@@ -42,7 +82,7 @@ def create_app():
         return jsonify({
             'message': 'APC Attendance Platform Flask Backend API is running.',
             'health_check': '/api/health',
-            'frontend_url': 'http://localhost:5173'
+            'frontend_url': 'https://pack-n-d.github.io/attendance-management-system/'
         }), 200
 
     @app.route('/api/health', methods=['GET'])
@@ -54,7 +94,5 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     print("APC Attendance Backend running on http://127.0.0.1:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)
