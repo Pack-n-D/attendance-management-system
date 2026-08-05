@@ -29,7 +29,7 @@ function ProtectedRoute({ children, allowedRoles }) {
   }
 
   // Handle forced password change redirect
-  const isChangePasswordPage = window.location.hash.includes('/profile/change-password');
+  const isChangePasswordPage = window.location.hash.toLowerCase().includes('/profile/change');
   if (user.mustChangePassword && !isChangePasswordPage) {
     return <Navigate to="/profile/change-password?forced=1" replace />;
   }
@@ -76,6 +76,14 @@ export default function App() {
           />
           <Route
             path="/profile/change-password"
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'super_admin']}>
+                <ChangePassword />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile/change%20password"
             element={
               <ProtectedRoute allowedRoles={['employee', 'super_admin']}>
                 <ChangePassword />
