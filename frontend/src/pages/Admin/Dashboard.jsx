@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
+import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
-import { Users, Clock, UserCheck, AlertTriangle, UserMinus, PlusCircle, Settings, FileSpreadsheet, TrendingUp } from 'lucide-react';
+import { Users, Clock, AlertTriangle, PlusCircle, Settings, TrendingUp } from 'lucide-react';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -44,26 +45,7 @@ export default function Dashboard() {
       <Navbar />
       <div className="apc-layout-container">
         {/* Admin Sidebar Navigation */}
-        <aside className="apc-sidebar">
-          <a href="/admin/dashboard" className="apc-nav-item active">
-            <TrendingUp size={18} /> Dashboard
-          </a>
-          <a href="/admin/employees" className="apc-nav-item">
-            <Users size={18} /> All Employees
-          </a>
-          <a href="/admin/employees/new" className="apc-nav-item">
-            <PlusCircle size={18} /> Create Employee
-          </a>
-          <a href="/admin/attendance" className="apc-nav-item">
-            <FileSpreadsheet size={18} /> Attendance Log
-          </a>
-          <a href="/admin/settings/attendance-rules" className="apc-nav-item">
-            <Settings size={18} /> Attendance Rules
-          </a>
-          <a href="/admin/audit-log" className="apc-nav-item">
-            <Clock size={18} /> Audit Log
-          </a>
-        </aside>
+        <AdminSidebar />
 
         {/* Main Dashboard Content */}
         <main className="apc-main-content">

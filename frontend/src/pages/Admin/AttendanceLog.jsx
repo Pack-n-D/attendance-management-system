@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
+import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch, exportAttendanceCSV } from '../../utils/api';
-import { Download, Search, FileSpreadsheet, Users, PlusCircle, Settings, Clock } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 
 export default function AttendanceLog() {
   const [records, setRecords] = useState([]);
@@ -41,26 +42,7 @@ export default function AttendanceLog() {
     <>
       <Navbar />
       <div className="apc-layout-container">
-        <aside className="apc-sidebar">
-          <a href="/admin/dashboard" className="apc-nav-item">
-            <Clock size={18} /> Dashboard
-          </a>
-          <a href="/admin/employees" className="apc-nav-item">
-            <Users size={18} /> All Employees
-          </a>
-          <a href="/admin/employees/new" className="apc-nav-item">
-            <PlusCircle size={18} /> Create Employee
-          </a>
-          <a href="/admin/attendance" className="apc-nav-item active">
-            <FileSpreadsheet size={18} /> Attendance Log
-          </a>
-          <a href="/admin/settings/attendance-rules" className="apc-nav-item">
-            <Settings size={18} /> Attendance Rules
-          </a>
-          <a href="/admin/audit-log" className="apc-nav-item">
-            <Clock size={18} /> Audit Log
-          </a>
-        </aside>
+        <AdminSidebar />
 
         <main className="apc-main-content">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>

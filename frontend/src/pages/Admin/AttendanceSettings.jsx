@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
+import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch } from '../../utils/api';
-import { Settings, Clock, Calendar, Plus, Trash2, Save, Info, Users, PlusCircle, FileSpreadsheet } from 'lucide-react';
+import { Settings, Clock, Plus, Trash2, Save, Info } from 'lucide-react';
 
 export default function AttendanceSettings() {
   const [idealPunchInTime, setIdealPunchInTime] = useState('09:30');
@@ -135,26 +136,7 @@ export default function AttendanceSettings() {
     <>
       <Navbar />
       <div className="apc-layout-container">
-        <aside className="apc-sidebar">
-          <a href="/admin/dashboard" className="apc-nav-item">
-            <Clock size={18} /> Dashboard
-          </a>
-          <a href="/admin/employees" className="apc-nav-item">
-            <Users size={18} /> All Employees
-          </a>
-          <a href="/admin/employees/new" className="apc-nav-item">
-            <PlusCircle size={18} /> Create Employee
-          </a>
-          <a href="/admin/attendance" className="apc-nav-item">
-            <FileSpreadsheet size={18} /> Attendance Log
-          </a>
-          <a href="/admin/settings/attendance-rules" className="apc-nav-item active">
-            <Settings size={18} /> Attendance Rules
-          </a>
-          <a href="/admin/audit-log" className="apc-nav-item">
-            <Clock size={18} /> Audit Log
-          </a>
-        </aside>
+        <AdminSidebar />
 
         <main className="apc-main-content" style={{ maxWidth: '850px' }}>
           <div style={{ marginBottom: '1.5rem' }}>
