@@ -1,21 +1,11 @@
-name: Deploy Backend to Railway (Optional CLI Trigger)
+name: Backend Railway Integration
 
 on:
   workflow_dispatch:
 
 jobs:
-  deploy-railway:
-    if: "${{ secrets.RAILWAY_TOKEN != '' }}"
+  railway-info:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy Backend to Railway
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          railway up --service backend --detach || railway up --detach
+      - name: Railway Integration Status
+        run: echo "Railway backend is deployed automatically via Railway's native GitHub integration."
