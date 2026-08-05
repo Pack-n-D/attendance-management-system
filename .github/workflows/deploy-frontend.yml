@@ -41,6 +41,8 @@ jobs:
           npm install
 
       - name: Build Frontend Production Assets
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
           cd frontend
           npm run build

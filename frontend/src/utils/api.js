@@ -1,4 +1,4 @@
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api` : '/api';
 
 export async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem('apc_token');
@@ -24,7 +24,7 @@ export async function apiFetch(endpoint, options = {}) {
     if (response.status === 401 && !endpoint.includes('/auth/login')) {
       localStorage.removeItem('apc_token');
       localStorage.removeItem('apc_user');
-      window.location.href = '/login?expired=1';
+      window.location.hash = '#/login?expired=1';
     }
     throw new Error(data.error || 'Request failed. Please try again.');
   }
