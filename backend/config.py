@@ -13,7 +13,10 @@ class Config:
     JWT_QUERY_STRING_NAME = 'token'
     
     # Database configuration (SQLite default, PostgreSQL compatible)
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', f"sqlite:///{os.path.join(BASE_DIR, 'apc_attendance.db')}")
+    _db_url = os.environ.get('DATABASE_URL', f"sqlite:///{os.path.join(BASE_DIR, 'apc_attendance.db')}")
+    if _db_url.startswith("postgres://"):
+        _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+    SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     UPLOAD_FOLDER = UPLOAD_FOLDER

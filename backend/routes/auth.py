@@ -11,45 +11,50 @@ failed_password_attempts = {}
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    data = request.get_json() or {}
-    identifier = data.get('identifier', '').strip()  # Can be Employee ID or Email
-    password = data.get('password', '')
+    try:
+        data = request.get_json() or {}
+        identifier = data.get('identifier', '').strip()  # Can be Employee ID or Email
+        password = data.get('password', '')
 
-    if not identifier or not password:
-        return jsonify({'error': 'Employee ID/Email and password are required'}), 400
+        if not identifier or not password:
+            return jsonify({'error': 'Employee ID/Email and password are required'}), 400
 
-    # Search by ID or Email
-    employee = Employee.query.filter(
-        (Employee.id == identifier) | (Employee.email == identifier)
-    ).first()
+        # Search by ID or Email
+        employee = Employee.query.filter(
+            (Employee.id == identifier) | (Employee.email == identifier)
+        ).first()
 
-    if not employee:
-        return jsonify({'error': 'Invalid credentials'}), 401
+        if not employee:
+            return jsonify({'error': 'Invalid credentials'}), 401
 
-    if employee.status != 'active':
-        return jsonify({'error': f'Account is {employee.status}. Please contact Super Admin.'}), 403
+        if employee.status != 'active':
+            return jsonify({'error': f'Account is {employee.status}. Please contact Super Admin.'}), 403
 
-    if not check_password_hash(employee.password_hash, password):
-        return jsonify({'error': 'Invalid credentials'}), 401
+        if not check_password_hash(employee.password_hash, password):
+            return jsonify({'error': 'Invalid credentials'}), 401
 
-    # Create tokens with claims
-    additional_claims = {
-        'role': employee.role,
-        'mustChangePassword': employee.must_change_password,
-        'name': f"{employee.first_name} {employee.last_name}"
-    }
-    
-    access_token = create_access_token(identity=employee.id, additional_claims=additional_claims)
-    refresh_token = create_refresh_token(identity=employee.id)
+        # Create tokens with claims
+        additional_claims = {
+            'role': employee.role,
+            'mustChangePassword': employee.must_change_password,
+            'name': f"{employee.first_name} {employee.last_name}"
+        }
+        
+        access_token = create_access_token(identity=employee.id, additional_claims=additional_claims)
+        refresh_token = create_refresh_token(identity=employee.id)
 
-    log_audit(employee.id, f"{employee.first_name} {employee.last_name}", "User Logged In", "Employee", employee.id)
+        log_audit(employee.id, f"{employee.first_name} {employee.last_name}", "User Logged In", "Employee", employee.id)
 
-    return jsonify({
-        'message': 'Login successful',
-        'token': access_token,
-        'refreshToken': refresh_token,
-        'user': employee.to_dict()
-    }), 200
+        return jsonify({
+            'message': 'Login successful',
+            'token': access_token,
+            'refreshToken': refresh_token,
+            'user': employee.to_dict()
+        }), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Server Login Error: {str(e)}'}), 500
 
 
 @auth_bp.route('/me', methods=['GET'])
