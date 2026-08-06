@@ -23,7 +23,7 @@ export default function CreateEmployee() {
   const [profilePhoto, setProfilePhoto] = useState(null);
 
   // Optional Accordion state
-  const [showDocAccordion, setShowDocAccordion] = useState(false);
+  const [showDocsAccordion, setShowDocsAccordion] = useState(false);
   const [managers, setManagers] = useState([]);
 
   // Step 2 Credentials Data
@@ -39,6 +39,15 @@ export default function CreateEmployee() {
   const [copiedId, setCopiedId] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [welcomeCardData, setWelcomeCardData] = useState(null);
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setProfilePhoto(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
 
   useEffect(() => {
     // Fetch potential reporting managers

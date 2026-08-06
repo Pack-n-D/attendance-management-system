@@ -119,14 +119,7 @@ def create_app():
             db.session.rollback()
             print(f"Auto-init warning: {e}")
 
-    @app.before_request
-    def ensure_db():
-        if not getattr(app, '_db_tables_created', False):
-            try:
-                db.create_all()
-                app._db_tables_created = True
-            except Exception as e:
-                print(f"before_request db init error: {e}")
+    # Static upload serving & root health check
 
     # Serve static uploaded files
     @app.route('/uploads/<path:filename>')
