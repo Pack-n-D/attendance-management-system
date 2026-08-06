@@ -58,6 +58,7 @@ export default function Dashboard() {
   const stats = data?.stats || { totalEmployees: 0, present: 0, late: 0, absent: 0, onLeave: 0 };
   const lateArrivals = data?.lateArrivalsToday || [];
   const trendChart = data?.trendChart || [];
+  const pendingLeavesList = (data?.pendingLeaveRequests && data.pendingLeaveRequests.length > 0) ? data.pendingLeaveRequests : pendingLeaves;
 
   if (loading) {
     return (
@@ -125,14 +126,14 @@ export default function Dashboard() {
           </div>
 
           {/* Org-Wide Pending Leave Approvals Section */}
-          {pendingLeaves.length > 0 && (
+          {pendingLeavesList.length > 0 && (
             <div className="apc-card" style={{ marginBottom: '1.75rem', borderLeft: '4px solid var(--apc-primary)' }}>
               <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Calendar size={18} color="var(--apc-primary-dark)" /> Pending Leave Requests for Approval ({pendingLeaves.length})
+                <Calendar size={18} color="var(--apc-primary-dark)" /> Pending Leave Requests for Approval ({pendingLeavesList.length})
               </h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-                {pendingLeaves.map(req => (
+                {pendingLeavesList.map(req => (
                   <div key={req.id} style={{ padding: '0.85rem', background: 'var(--apc-bg)', border: '1px solid var(--apc-border)', borderRadius: 'var(--apc-radius-sm)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>

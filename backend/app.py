@@ -11,6 +11,68 @@ from routes.employee import employee_bp
 from routes.attendance import attendance_bp
 from routes.settings import settings_bp
 
+# Auto-copy APC logo to frontend public directory and update Logo.jsx if available
+try:
+    src_logo = r"C:\Users\DELL\.gemini\antigravity-ide\brain\515809aa-58ff-4f1a-9cca-9f63449b16dc\media__1785992519769.png"
+    if os.path.exists(src_logo):
+        import shutil
+        import base64
+        public_dst = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'public', 'logo.png')
+        assets_dst = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'src', 'assets', 'logo.png')
+        logo_jsx_path = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'src', 'components', 'Logo.jsx')
+        
+        os.makedirs(os.path.dirname(public_dst), exist_ok=True)
+        os.makedirs(os.path.dirname(assets_dst), exist_ok=True)
+        shutil.copy(src_logo, public_dst)
+        shutil.copy(src_logo, assets_dst)
+
+        with open(src_logo, 'rb') as f:
+            b64_data = base64.b64encode(f.read()).decode('utf-8')
+
+        logo_jsx_content = f'''import React from 'react';
+
+const EMBEDDED_APC_LOGO = "data:image/png;base64,{b64_data}";
+
+export default function Logo({{ lockup = 'full', size = 'medium', showSubtitle = true, customSrc }}) {{
+  const logoPath = customSrc || EMBEDDED_APC_LOGO;
+  const isSmall = size === 'small';
+  const isLarge = size === 'large';
+  const imageHeight = isLarge ? '52px' : isSmall ? '34px' : '42px';
+
+  return (
+    <div style={{{{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}}}>
+      <img
+        src={{logoPath}}
+        alt="APC Company Logo"
+        style={{{{
+          height: imageHeight,
+          width: 'auto',
+          maxHeight: imageHeight,
+          objectFit: 'contain'
+        }}}}
+      />
+      {{lockup === 'full' && showSubtitle && (
+        <span
+          style={{{{
+            fontSize: isSmall ? '0.65rem' : '0.72rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            color: '#75706A'
+          }}}}
+        >
+          Attendance
+        </span>
+      )}}
+    </div>
+  );
+}}
+'''
+        with open(logo_jsx_path, 'w', encoding='utf-8') as f:
+            f.write(logo_jsx_content)
+except Exception as e:
+    print("Logo copy error:", e)
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -20,20 +82,6 @@ def create_app():
 
     # Ensure upload folder exists
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-    # Auto-copy APC logo to frontend public directory if available
-    try:
-        src_logo = r"C:\Users\DELL\.gemini\antigravity-ide\brain\515809aa-58ff-4f1a-9cca-9f63449b16dc\media__1785992519769.png"
-        if os.path.exists(src_logo):
-            import shutil
-            public_dst = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'public', 'logo.png')
-            assets_dst = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'src', 'assets', 'logo.png')
-            os.makedirs(os.path.dirname(public_dst), exist_ok=True)
-            os.makedirs(os.path.dirname(assets_dst), exist_ok=True)
-            shutil.copy(src_logo, public_dst)
-            shutil.copy(src_logo, assets_dst)
-    except Exception as e:
-        print("Logo copy error:", e)
 
     # Initialize extensions
     db.init_app(app)

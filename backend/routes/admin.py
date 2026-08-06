@@ -80,6 +80,9 @@ def get_dashboard_stats():
                 
     trend_chart = list(trend_by_date.values())
     
+    # Pending org-wide leave requests
+    pending_leaves = LeaveRequest.query.filter_by(status='pending').order_by(LeaveRequest.created_at.desc()).all()
+
     return jsonify({
         'todayDate': today_str,
         'stats': {
@@ -90,6 +93,7 @@ def get_dashboard_stats():
             'onLeave': on_leave_count
         },
         'lateArrivalsToday': late_arrivals,
+        'pendingLeaveRequests': [l.to_dict() for l in pending_leaves],
         'trendChart': trend_chart
     }), 200
 
