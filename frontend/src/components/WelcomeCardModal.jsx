@@ -1,5 +1,6 @@
 import React from 'react';
 import Logo from './Logo';
+import { getPhotoUrl } from '../utils/api';
 import { Printer, X, User } from 'lucide-react';
 
 export default function WelcomeCardModal({ data, onClose }) {
@@ -13,6 +14,8 @@ export default function WelcomeCardModal({ data, onClose }) {
   const initials = data.fullName
     ? data.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
     : 'EMP';
+
+  const photoSrc = getPhotoUrl(data.profilePhotoUrl);
 
   return (
     <div className="apc-modal-overlay">
@@ -32,7 +35,7 @@ export default function WelcomeCardModal({ data, onClose }) {
         <div className="apc-welcome-card" id="printable-welcome-card" style={{ position: 'relative', overflow: 'hidden' }}>
           {/* Card Top Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px dashed var(--apc-border)' }}>
-            <Logo lockup="full" size="small" />
+            <Logo lockup="full" size="small" showSubtitle={false} />
             <span style={{
               fontSize: '0.72rem',
               background: 'var(--apc-primary-dark)',
@@ -96,9 +99,9 @@ export default function WelcomeCardModal({ data, onClose }) {
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
               flexShrink: 0
             }}>
-              {data.profilePhotoUrl ? (
+              {photoSrc ? (
                 <img
-                  src={data.profilePhotoUrl}
+                  src={photoSrc}
                   alt={data.fullName}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />

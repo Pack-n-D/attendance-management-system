@@ -135,7 +135,7 @@ export default function CreateEmployee() {
 
       setWelcomeCardData({
         ...res.welcomeCard,
-        profilePhotoUrl: res.welcomeCard?.profilePhotoUrl || profilePhoto
+        profilePhotoUrl: profilePhoto ? profilePhoto : res.welcomeCard?.profilePhotoUrl
       });
     } catch (err) {
       setError(err.message);
