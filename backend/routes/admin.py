@@ -5,7 +5,7 @@ from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models import db, Employee, Document, AttendanceRecord, AttendanceRule, Holiday, AuditLog
-from utils import generate_employee_id, validate_password, generate_random_password, log_audit
+from utils import generate_employee_id, validate_password, generate_random_password, log_audit, get_current_now, get_current_date_str, get_current_time_str
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 

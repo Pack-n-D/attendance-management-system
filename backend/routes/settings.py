@@ -2,7 +2,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models import db, AttendanceRule, Holiday, Employee
-from utils import log_audit
+from utils import log_audit, get_current_date_str
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/api/settings')
 

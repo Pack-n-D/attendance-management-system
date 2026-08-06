@@ -4,7 +4,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models import db, Employee, AttendanceRecord, AttendanceRule, Holiday, AuditLog
-from utils import compute_attendance_status, log_audit
+from utils import compute_attendance_status, log_audit, get_current_now, get_current_date_str, get_current_time_str
 
 attendance_bp = Blueprint('attendance', __name__, url_prefix='/api/attendance')
 
