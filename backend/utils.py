@@ -1,14 +1,30 @@
 import re
 import random
 import string
-from datetime import datetime, time
+from datetime import datetime, time, timezone, timedelta
 from models import db, Employee, AttendanceRule, AuditLog, Holiday
+
+# IST Timezone (+05:30) for AP Corporation operations
+IST_TZ = timezone(timedelta(hours=5, minutes=30))
+
+def get_current_now():
+    """Returns current timezone-aware datetime object in IST."""
+    return datetime.now(IST_TZ)
+
+def get_current_date_str():
+    """Returns current date YYYY-MM-DD in IST."""
+    return get_current_now().strftime('%Y-%m-%d')
+
+def get_current_time_str():
+    """Returns current time HH:MM:SS in IST."""
+    return get_current_now().strftime('%H:%M:%S')
 
 def generate_employee_id(first_name: str, last_name: str, dob: str) -> str:
     """
     Generates a ~10-character human-parseable Employee ID:
     e.g. First Name: John, Last Name: Doe, DOB: 1999-04-15
     Prefix: JO-DO-99-XXXX
+    Guarantees unique ID generation in DB.
     """
     fn = (first_name.strip()[:2] if len(first_name.strip()) >= 2 else (first_name.strip() + 'X')[:2]).upper()
     ln = (last_name.strip()[:2] if len(last_name.strip()) >= 2 else (last_name.strip() + 'X')[:2]).upper()
@@ -19,11 +35,13 @@ def generate_employee_id(first_name: str, last_name: str, dob: str) -> str:
         
     prefix = f"{fn}-{ln}-{birth_year_suffix}"
     
-    # Find existing matching prefixes in DB to increment serial
-    existing_count = Employee.query.filter(Employee.id.like(f"{prefix}-%")).count()
-    serial = existing_count + 1
-    
-    return f"{prefix}-{serial:04d}"
+    # Loop to find next available candidate ID that does not exist in DB
+    serial = 1
+    while True:
+        candidate_id = f"{prefix}-{serial:04d}"
+        if not Employee.query.get(candidate_id):
+            return candidate_id
+        serial += 1
 
 
 def validate_password(password: str):
