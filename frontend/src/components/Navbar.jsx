@@ -14,15 +14,22 @@ export default function Navbar() {
     navigate('/login');
   };
 
-  const displayName = user
-    ? (user.fullName || `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || 'User')
-    : 'User';
+  // Safely extract display fields with multiple fallback layers
+  let displayName = 'User';
+  let avatarInitial = 'U';
+  let photoUrl = null;
 
-  const avatarInitial = user
-    ? (user.firstName || user.first_name || user.fullName || 'U')[0].toUpperCase()
-    : 'U';
-
-  const photoUrl = user?.profilePhotoUrl ? getPhotoUrl(user.profilePhotoUrl) : null;
+  try {
+    if (user) {
+      const fn = user.firstName || user.first_name || '';
+      const ln = user.lastName || user.last_name || '';
+      displayName = user.fullName || `${fn} ${ln}`.trim() || 'User';
+      avatarInitial = (fn || displayName || 'U').charAt(0).toUpperCase() || 'U';
+      photoUrl = user.profilePhotoUrl ? getPhotoUrl(user.profilePhotoUrl) : null;
+    }
+  } catch (e) {
+    console.error('Navbar user field error:', e);
+  }
 
   return (
     <header className="apc-header">
@@ -44,7 +51,7 @@ export default function Navbar() {
                   </>
                 ) : (
                   <>
-                    <User size={12} /> {user.id} ({user.department || 'General'})
+                    <User size={12} /> {user.id || ''} ({user.department || 'General'})
                   </>
                 )}
               </span>
