@@ -274,6 +274,8 @@ export default function CreateEmployee() {
                     <option value="Media Buying">Media Buying</option>
                     <option value="Finance">Finance</option>
                     <option value="HR">HR</option>
+                    <option value="Development">IT</option>
+                    <option value="Marketing">Marketing</option>
                   </select>
                 </div>
 

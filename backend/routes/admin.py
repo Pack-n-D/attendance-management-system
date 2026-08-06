@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from models import db, Employee, Document, AttendanceRecord, AttendanceRule, Holiday, AuditLog
+from models import db, Employee, Document, AttendanceRecord, AttendanceRule, Holiday, AuditLog, LeaveRequest
 from utils import generate_employee_id, validate_password, generate_random_password, log_audit, get_current_now, get_current_date_str, get_current_time_str, save_base64_photo
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -311,6 +311,94 @@ def toggle_employee_status(id):
         'message': f"Employee status updated to {new_status}",
         'status': new_status
     }), 200
+
+
+# --- ADMIN LEAVE MANAGEMENT ---
+
+@admin_bp.route('/leave-requests', methods=['GET'])
+def get_all_leave_requests():
+    status = request.args.get('status')
+    search = request.args.get('search')
+
+    query = LeaveRequest.query.join(Employee, LeaveRequest.employee_id == Employee.id)
+
+    if status:
+        query = query.filter(LeaveRequest.status == status)
+
+    if search:
+        search_pattern = f"%{search.strip()}%"
+        query = query.filter(
+            (Employee.first_name.ilike(search_pattern)) |
+            (Employee.last_name.ilike(search_pattern)) |
+            (Employee.id.ilike(search_pattern))
+        )
+
+    requests = query.order_by(LeaveRequest.created_at.desc()).all()
+    return jsonify({
+        'leaveRequests': [r.to_dict() for r in requests]
+    }), 200
+
+
+@admin_bp.route('/leave-requests/<int:req_id>/review', methods=['POST'])
+def admin_review_leave_request(req_id):
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    leave_req = LeaveRequest.query.get(req_id)
+    if not leave_req:
+        return jsonify({'error': 'Leave request not found'}), 404
+
+    data = request.get_json() or {}
+    action = data.get('action')  # 'approve' or 'reject'
+    comment = data.get('comment', '')
+
+    if action not in ['approve', 'reject']:
+        return jsonify({'error': 'Action must be approve or reject'}), 400
+
+    leave_req.status = 'approved' if action == 'approve' else 'rejected'
+    leave_req.manager_comment = comment
+    leave_req.reviewed_at = datetime.utcnow()
+
+    # If approved, update attendance records to on_leave for that date range
+    if action == 'approve':
+        try:
+            start_dt = datetime.strptime(leave_req.start_date, '%Y-%m-%d')
+            end_dt = datetime.strptime(leave_req.end_date, '%Y-%m-%d')
+            curr_dt = start_dt
+
+            while curr_dt <= end_dt:
+                d_str = curr_dt.strftime('%Y-%m-%d')
+                rec = AttendanceRecord.query.filter_by(employee_id=leave_req.employee_id, date=d_str).first()
+                if rec:
+                    rec.status = 'on_leave'
+                else:
+                    rec = AttendanceRecord(
+                        employee_id=leave_req.employee_id,
+                        date=d_str,
+                        status='on_leave',
+                        late_reason=f"Approved Leave: {leave_req.leave_type} - {leave_req.reason}"
+                    )
+                    db.session.add(rec)
+                curr_dt += timedelta(days=1)
+        except Exception as e:
+            print(f"Error updating leave attendance records: {e}")
+
+    db.session.commit()
+
+    log_audit(
+        admin_id,
+        admin_name,
+        f"Super Admin {action.capitalize()}d Leave Request #{req_id} for Employee {leave_req.employee_id}",
+        "LeaveRequest",
+        str(req_id)
+    )
+
+    return jsonify({
+        'message': f'Leave request successfully {leave_req.status} by Super Admin.',
+        'leaveRequest': leave_req.to_dict()
+    }), 200
+
 
 
 # --- AUDIT LOG ---

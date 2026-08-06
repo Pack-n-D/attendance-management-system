@@ -1,26 +1,27 @@
 import React, { useState } from 'react';
+import logoImg from '../assets/logo.png';
 
 /**
  * Global Logo component for AP Corporation Attendance System.
- * Automatically checks for custom PNG logo at '/logo.png' (placed in public directory),
- * and gracefully falls back to the stylized APC brand lockup if no PNG logo is present.
+ * Uses Vite imported logo asset to guarantee rendering across GitHub Pages base paths
+ * and gracefully falls back to the APC brand SVG mark if missing.
  */
 export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = true, customSrc }) {
   const [imgError, setImgError] = useState(false);
-  const logoPath = customSrc || '/logo.png';
+  const logoPath = customSrc || logoImg || './logo.png';
 
   const isSmall = size === 'small';
   const isLarge = size === 'large';
   const fontSize = isLarge ? '2.2rem' : isSmall ? '1.2rem' : '1.5rem';
   const imageHeight = isLarge ? '48px' : isSmall ? '32px' : '40px';
 
-  // If custom PNG logo is available and hasn't failed loading
+  // If PNG logo is loaded and hasn't errored out
   if (!imgError) {
     return (
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
         <img
           src={logoPath}
-          alt="Company Logo"
+          alt="APC Company Logo"
           onError={() => setImgError(true)}
           style={{
             height: imageHeight,
@@ -46,57 +47,9 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
     );
   }
 
-  // Fallback APC Lockups if PNG logo is not available
-  if (lockup === 'icon') {
-    return (
-      <div
-        style={{
-          width: isLarge ? '48px' : isSmall ? '32px' : '40px',
-          height: isLarge ? '48px' : isSmall ? '32px' : '40px',
-          backgroundColor: '#F5A623',
-          borderRadius: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#1A1612',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 900,
-          fontStyle: 'italic',
-          fontSize: isLarge ? '1.8rem' : isSmall ? '1rem' : '1.4rem',
-          boxShadow: '0 2px 6px rgba(245, 166, 35, 0.4)'
-        }}
-      >
-        A
-      </div>
-    );
-  }
-
-  if (lockup === 'monogram') {
-    return (
-      <div
-        style={{
-          padding: isSmall ? '4px 8px' : '6px 12px',
-          backgroundColor: '#FDECC8',
-          border: '1px solid #F5A623',
-          borderRadius: '20px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '4px',
-          color: '#D9880F',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 900,
-          fontStyle: 'italic',
-          fontSize: isSmall ? '0.9rem' : '1.1rem'
-        }}
-      >
-        AP
-      </div>
-    );
-  }
-
+  // Fallback APC Lockup
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-      {/* Icon Badge */}
       <div
         style={{
           width: isLarge ? '42px' : isSmall ? '28px' : '34px',

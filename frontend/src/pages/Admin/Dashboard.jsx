@@ -4,15 +4,18 @@ import StatusBadge from '../../components/StatusBadge';
 import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
-import { Users, Clock, AlertTriangle, PlusCircle, Settings, TrendingUp } from 'lucide-react';
+import { Users, Clock, AlertTriangle, PlusCircle, Settings, TrendingUp, Calendar, Check, X } from 'lucide-react';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [pendingLeaves, setPendingLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reviewingId, setReviewingId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboard();
+    fetchPendingLeaves();
   }, []);
 
   const fetchDashboard = async () => {
@@ -24,6 +27,31 @@ export default function Dashboard() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPendingLeaves = async () => {
+    try {
+      const res = await apiFetch('/admin/leave-requests?status=pending');
+      setPendingLeaves(res.leaveRequests || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAdminReviewLeave = async (reqId, action) => {
+    setReviewingId(reqId);
+    try {
+      await apiFetch(`/admin/leave-requests/${reqId}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ action })
+      });
+      fetchPendingLeaves();
+      fetchDashboard();
+    } catch (err) {
+      alert("Review failed: " + err.message);
+    } finally {
+      setReviewingId(null);
     }
   };
 
@@ -95,6 +123,56 @@ export default function Dashboard() {
               <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)' }}>approved leave / holiday</span>
             </div>
           </div>
+
+          {/* Org-Wide Pending Leave Approvals Section */}
+          {pendingLeaves.length > 0 && (
+            <div className="apc-card" style={{ marginBottom: '1.75rem', borderLeft: '4px solid var(--apc-primary)' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Calendar size={18} color="var(--apc-primary-dark)" /> Pending Leave Requests for Approval ({pendingLeaves.length})
+              </h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                {pendingLeaves.map(req => (
+                  <div key={req.id} style={{ padding: '0.85rem', background: 'var(--apc-bg)', border: '1px solid var(--apc-border)', borderRadius: 'var(--apc-radius-sm)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <strong>{req.employeeName}</strong>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', marginLeft: '6px' }}>({req.department})</span>
+                        <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', color: 'var(--apc-primary-dark)', fontWeight: 600 }}>
+                          {req.leaveType}: {req.startDate} to {req.endDate}
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', marginTop: '0.2rem' }}>
+                          <strong>Reason:</strong> {req.reason}
+                        </p>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)' }}>
+                          Manager: {req.reportingManagerName || 'Super Admin'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <button
+                          onClick={() => handleAdminReviewLeave(req.id, 'approve')}
+                          className="apc-btn apc-btn-primary"
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                          disabled={reviewingId === req.id}
+                        >
+                          <Check size={14} /> Approve
+                        </button>
+                        <button
+                          onClick={() => handleAdminReviewLeave(req.id, 'reject')}
+                          className="apc-btn apc-btn-danger"
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                          disabled={reviewingId === req.id}
+                        >
+                          <X size={14} /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             {/* Late Arrivals Today List */}
