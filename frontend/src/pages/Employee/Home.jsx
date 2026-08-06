@@ -103,10 +103,17 @@ export default function Home() {
     setError('');
 
     try {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      const clientTimeStr = `${h}:${m}:${s}`;
+
       const endpoint = punchType === 'in' ? '/attendance/punch-in' : '/attendance/punch-out';
       const body = {
         photo: capturedPhoto,
-        lateReason: lateReason
+        lateReason: lateReason,
+        clientTime: clientTimeStr
       };
 
       const res = await apiFetch(endpoint, {

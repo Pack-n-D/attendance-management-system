@@ -55,15 +55,16 @@ def punch_in():
     if not employee:
         return jsonify({'error': 'Employee not found'}), 404
 
-    today_str = datetime.utcnow().strftime('%Y-%m-%d')
-    now_time_str = datetime.utcnow().strftime('%H:%M:%S')
+    data = request.get_json() or {}
+    client_time = data.get('clientTime')
+    today_str = get_current_date_str()
+    now_time_str = client_time if (client_time and len(client_time) >= 5) else get_current_time_str()
 
     # Check if already punched in
     existing = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
     if existing and existing.punch_in_time:
         return jsonify({'error': f'Already punched in today at {existing.punch_in_time}'}), 400
 
-    data = request.get_json() or {}
     photo_base64 = data.get('photo')
     location = data.get('location')
     late_reason = data.get('lateReason', '').strip()
@@ -118,8 +119,10 @@ def punch_in():
 @jwt_required()
 def punch_out():
     user_id = get_jwt_identity()
-    today_str = datetime.utcnow().strftime('%Y-%m-%d')
-    now_time_str = datetime.utcnow().strftime('%H:%M:%S')
+    data = request.get_json() or {}
+    client_time = data.get('clientTime')
+    today_str = get_current_date_str()
+    now_time_str = client_time if (client_time and len(client_time) >= 5) else get_current_time_str()
 
     record = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
     if not record:
