@@ -16,7 +16,14 @@ def create_app():
     app.config.from_object(Config)
 
     # Enable CORS for frontend client
-    CORS(app, resources={r"/api/*": {"origins": "*"}, r"/uploads/*": {"origins": "*"}})
+    CORS(app, resources={r"/*": {"origins": "*"}})
+
+    @app.after_request
+    def add_cors_headers(response):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        return response
 
     # Ensure upload folder exists
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
