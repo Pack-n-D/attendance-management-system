@@ -19,10 +19,13 @@ export default function Login() {
     setError('');
 
     try {
-      const user = await login(identifier, password);
-      if (user.mustChangePassword) {
+      const loggedInUser = await login(identifier, password);
+      if (!loggedInUser) {
+        throw new Error('Login failed. Please check your credentials.');
+      }
+      if (loggedInUser.mustChangePassword) {
         navigate('/profile/change-password?forced=1');
-      } else if (user.role === 'super_admin') {
+      } else if (loggedInUser.role === 'super_admin') {
         navigate('/admin/dashboard');
       } else {
         navigate('/home');

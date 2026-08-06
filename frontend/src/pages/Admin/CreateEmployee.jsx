@@ -186,8 +186,12 @@ export default function CreateEmployee() {
       });
 
       setWelcomeCardData({
-        ...res.welcomeCard,
-        profilePhotoUrl: profilePhoto ? profilePhoto : res.welcomeCard?.profilePhotoUrl
+        fullName: res.welcomeCard?.fullName || res.employee?.fullName || `${firstName.trim()} ${lastName.trim()}`,
+        employeeId: res.welcomeCard?.employeeId || res.employee?.id || generatedId || getFallbackId(),
+        department: res.welcomeCard?.department || res.employee?.department || department,
+        designation: res.welcomeCard?.designation || res.employee?.designation || designation,
+        dateOfJoining: res.welcomeCard?.dateOfJoining || res.employee?.dateOfJoining || dateOfJoining,
+        profilePhotoUrl: profilePhoto || res.welcomeCard?.profilePhotoUrl || res.employee?.profilePhotoUrl
       });
     } catch (err) {
       setError(err.message);
