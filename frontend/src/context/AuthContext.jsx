@@ -3,20 +3,35 @@ import { apiFetch } from '../utils/api';
 
 const AuthContext = createContext();
 
+function safeParseJSON(str) {
+  if (!str || str === 'undefined' || str === 'null') return null;
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('apc_user');
-    return saved ? JSON.parse(saved) : null;
+    return safeParseJSON(localStorage.getItem('apc_user'));
   });
-  const [token, setToken] = useState(() => localStorage.getItem('apc_token'));
+  const [token, setToken] = useState(() => {
+    const t = localStorage.getItem('apc_token');
+    return (t && t !== 'undefined' && t !== 'null') ? t : null;
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (token && !user) {
       apiFetch('/auth/me')
         .then(res => {
-          setUser(res.user);
-          localStorage.setItem('apc_user', JSON.stringify(res.user));
+          if (res && res.user) {
+            setUser(res.user);
+            localStorage.setItem('apc_user', JSON.stringify(res.user));
+          } else {
+            logout();
+          }
         })
         .catch(() => logout());
     }
@@ -29,6 +44,9 @@ export function AuthProvider({ children }) {
         method: 'POST',
         body: JSON.stringify({ identifier, password })
       });
+      if (!data || !data.token || !data.user) {
+        throw new Error('Invalid login response from server.');
+      }
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('apc_token', data.token);
