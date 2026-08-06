@@ -218,10 +218,20 @@ export default function EmployeeProfile() {
                 {editingOverview ? (
                   <select className="apc-select" value={form.department || ''} onChange={e => setForm({ ...form, department: e.target.value })}>
                     <option value="Creative">Creative</option>
-                    <option value="Client Servicing">Client Servicing</option>
-                    <option value="Media Buying">Media Buying</option>
+                    <option value="CRM">CRM</option>
+                    <option value="SCM">SCM</option>
                     <option value="Finance">Finance</option>
                     <option value="HR">HR</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Sales">Sales</option>
+                    <option value="Operations">Operations</option>
+                    <option value="Product">Product</option>
+                    <option value="Digital Marketing">Digital Marketing</option>
+                    <option value="Management">Management</option>
+                    <option value="Designing">Designing</option>
+                    <option value="Admin">Admin</option>
+
+
                   </select>
                 ) : (
                   <strong>{emp?.department}</strong>
