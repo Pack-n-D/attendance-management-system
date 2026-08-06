@@ -44,14 +44,19 @@ export function AuthProvider({ children }) {
         method: 'POST',
         body: JSON.stringify({ identifier, password })
       });
-      if (!data || !data.token || !data.user) {
-        throw new Error('Invalid login response from server.');
+      const userObj = data?.user;
+      const tokenStr = data?.token;
+      if (!tokenStr) {
+        console.error('Login response missing token:', data);
+        throw new Error(data?.error || 'Login failed. Server did not return a valid session.');
       }
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('apc_token', data.token);
-      localStorage.setItem('apc_user', JSON.stringify(data.user));
-      return data.user;
+      setToken(tokenStr);
+      setUser(userObj || null);
+      localStorage.setItem('apc_token', tokenStr);
+      if (userObj) {
+        localStorage.setItem('apc_user', JSON.stringify(userObj));
+      }
+      return userObj;
     } finally {
       setLoading(false);
     }

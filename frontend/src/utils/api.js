@@ -31,7 +31,16 @@ export async function apiFetch(endpoint, options = {}) {
     headers
   });
 
-  const data = await response.json().catch(() => ({}));
+  let data = {};
+  try {
+    const text = await response.text();
+    data = text ? JSON.parse(text) : {};
+  } catch (parseErr) {
+    // Backend returned non-JSON (e.g. Railway 502/503 proxy page)
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}. Backend may be restarting — please try again in 30 seconds.`);
+    }
+  }
 
   if (!response.ok) {
     // Check if token expired or unauthorized
@@ -40,7 +49,7 @@ export async function apiFetch(endpoint, options = {}) {
       localStorage.removeItem('apc_user');
       window.location.hash = '#/login?expired=1';
     }
-    throw new Error(data.error || 'Request failed. Please try again.');
+    throw new Error(data.error || `Request failed (${response.status}). Please try again.`);
   }
 
   return data;
