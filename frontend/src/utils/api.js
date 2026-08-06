@@ -1,4 +1,4 @@
-const DEFAULT_PROD_API = 'https://capable-dedication-production.up.railway.app';
+const DEFAULT_PROD_API = 'https://web-production-f5d6b.up.railway.app';
 const API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api`
   : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -32,14 +32,18 @@ export async function apiFetch(endpoint, options = {}) {
   });
 
   let data = {};
+  const text = await response.text();
+  if (text.trim().startsWith('<') || text.trim().toLowerCase().startsWith('<!doctype')) {
+    throw new Error('Backend API URL misconfigured. Received HTML page instead of JSON API response.');
+  }
+
   try {
-    const text = await response.text();
     data = text ? JSON.parse(text) : {};
   } catch (parseErr) {
-    // Backend returned non-JSON (e.g. Railway 502/503 proxy page)
     if (!response.ok) {
       throw new Error(`Server returned ${response.status}. Backend may be restarting — please try again in 30 seconds.`);
     }
+    throw new Error('Invalid JSON response received from API server.');
   }
 
   if (!response.ok) {
