@@ -50,17 +50,59 @@ def seed_database():
         )
         db.session.add(admin)
 
+        print("Creating Karan Muntode (Reporting Manager)...")
+        karan = Employee(
+            id='KA-MU-95-0001',
+            first_name='Karan',
+            last_name='Muntode',
+            phone='+91 9876543210',
+            email='karan@apc.com',
+            dob='1995-05-12',
+            date_of_joining='2022-01-15',
+            designation='Team Manager / Lead',
+            department='Client Servicing',
+            employment_type='Full-time',
+            role='employee',
+            status='active',
+            password_hash=generate_password_hash('Password@123'),
+            must_change_password=False,
+            created_by='System Seed'
+        )
+        db.session.add(karan)
+        db.session.commit()
+
+        print("Creating Shivnath Gosavi (Reporting to Karan Muntode)...")
+        shivnath = Employee(
+            id='SH-GO-98-0001',
+            first_name='Shivnath',
+            last_name='Gosavi',
+            phone='+91 9876543211',
+            email='shivnath@apc.com',
+            dob='1998-08-20',
+            date_of_joining='2023-03-10',
+            designation='Product Specialist',
+            department='Client Servicing',
+            employment_type='Full-time',
+            reporting_manager_id=karan.id,
+            role='employee',
+            status='active',
+            password_hash=generate_password_hash('Password@123'),
+            must_change_password=False,
+            created_by='System Seed'
+        )
+        db.session.add(shivnath)
+
         # Seed initial audit log
         log = AuditLog(
             actor_id='SUPERADMIN01',
             actor_name='APC Admin',
-            action='System Initialized (Super Admin Created)',
+            action='System Initialized (Super Admin & Managers Created)',
             target_type='System'
         )
         db.session.add(log)
 
         db.session.commit()
-        print("Database seeded with clean Super Admin account successfully!")
+        print("Database seeded with Super Admin, Karan Muntode & Shivnath Gosavi successfully!")
 
 if __name__ == '__main__':
     seed_database()

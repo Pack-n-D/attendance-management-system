@@ -21,6 +21,20 @@ def create_app():
     # Ensure upload folder exists
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+    # Auto-copy APC logo to frontend public directory if available
+    try:
+        src_logo = r"C:\Users\DELL\.gemini\antigravity-ide\brain\515809aa-58ff-4f1a-9cca-9f63449b16dc\media__1785992519769.png"
+        if os.path.exists(src_logo):
+            import shutil
+            public_dst = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'public', 'logo.png')
+            assets_dst = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'src', 'assets', 'logo.png')
+            os.makedirs(os.path.dirname(public_dst), exist_ok=True)
+            os.makedirs(os.path.dirname(assets_dst), exist_ok=True)
+            shutil.copy(src_logo, public_dst)
+            shutil.copy(src_logo, assets_dst)
+    except Exception as e:
+        print("Logo copy error:", e)
+
     # Initialize extensions
     db.init_app(app)
     JWTManager(app)
@@ -57,17 +71,64 @@ def create_app():
                     created_by='Auto Init'
                 )
                 db.session.add(admin)
-                if not AttendanceRule.query.first():
-                    rule = AttendanceRule(
-                        ideal_punch_in_time='09:30',
-                        ideal_punch_out_time='18:30',
-                        buffer_minutes_in=15,
-                        buffer_minutes_out=15,
-                        weekly_offs='Saturday,Sunday',
-                        half_day_threshold_in='12:00'
-                    )
-                    db.session.add(rule)
+
+            # Seed Karan Muntode (Reporting Manager) if not present
+            karan = Employee.query.filter_by(email='karan@apc.com').first()
+            if not karan:
+                karan = Employee(
+                    id='KA-MU-95-0001',
+                    first_name='Karan',
+                    last_name='Muntode',
+                    phone='+91 9876543210',
+                    email='karan@apc.com',
+                    dob='1995-05-12',
+                    date_of_joining='2022-01-15',
+                    designation='Team Manager / Lead',
+                    department='Client Servicing',
+                    employment_type='Full-time',
+                    role='employee',
+                    status='active',
+                    password_hash=generate_password_hash('Password@123'),
+                    must_change_password=False,
+                    created_by='Auto Init'
+                )
+                db.session.add(karan)
                 db.session.commit()
+
+            # Seed Shivnath Gosavi (Employee reporting to Karan Muntode) if not present
+            shivnath = Employee.query.filter_by(email='shivnath@apc.com').first()
+            if not shivnath:
+                shivnath = Employee(
+                    id='SH-GO-98-0001',
+                    first_name='Shivnath',
+                    last_name='Gosavi',
+                    phone='+91 9876543211',
+                    email='shivnath@apc.com',
+                    dob='1998-08-20',
+                    date_of_joining='2023-03-10',
+                    designation='Product Specialist',
+                    department='Client Servicing',
+                    employment_type='Full-time',
+                    reporting_manager_id=karan.id if karan else 'KA-MU-95-0001',
+                    role='employee',
+                    status='active',
+                    password_hash=generate_password_hash('Password@123'),
+                    must_change_password=False,
+                    created_by='Auto Init'
+                )
+                db.session.add(shivnath)
+
+            if not AttendanceRule.query.first():
+                rule = AttendanceRule(
+                    ideal_punch_in_time='09:30',
+                    ideal_punch_out_time='18:30',
+                    buffer_minutes_in=15,
+                    buffer_minutes_out=15,
+                    weekly_offs='Saturday,Sunday',
+                    half_day_threshold_in='12:00'
+                )
+                db.session.add(rule)
+            db.session.commit()
         except Exception as e:
             db.session.rollback()
             print(f"Auto-init warning: {e}")

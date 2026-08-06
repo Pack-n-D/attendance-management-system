@@ -5,7 +5,7 @@ from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models import db, Employee, Document, AttendanceRecord, AttendanceRule, Holiday, AuditLog
-from utils import generate_employee_id, validate_password, generate_random_password, log_audit, get_current_now, get_current_date_str, get_current_time_str
+from utils import generate_employee_id, validate_password, generate_random_password, log_audit, get_current_now, get_current_date_str, get_current_time_str, save_base64_photo
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -172,6 +172,10 @@ def create_employee():
     if not valid_pass:
         return jsonify({'error': pass_msg}), 400
 
+    # Save profile photo if provided
+    profile_photo_b64 = data.get('profilePhoto') or data.get('photo')
+    photo_url = save_base64_photo(profile_photo_b64, folder_name=f"avatar_{emp_id}") if profile_photo_b64 else None
+
     # Create employee record
     employee = Employee(
         id=emp_id,
@@ -187,6 +191,7 @@ def create_employee():
         reporting_manager_id=data.get('reportingManagerId'),
         role='employee',
         status='active',
+        profile_photo_url=photo_url,
         password_hash=generate_password_hash(password),
         must_change_password=data.get('mustChangePassword', True),
         created_by=admin_name
@@ -208,7 +213,8 @@ def create_employee():
             'tempPassword': password,
             'designation': employee.designation,
             'department': employee.department,
-            'dateOfJoining': employee.date_of_joining
+            'dateOfJoining': employee.date_of_joining,
+            'profilePhotoUrl': employee.profile_photo_url
         }
     }), 201
 

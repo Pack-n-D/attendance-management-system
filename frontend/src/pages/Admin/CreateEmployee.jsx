@@ -20,6 +20,7 @@ export default function CreateEmployee() {
   const [department, setDepartment] = useState('Creative');
   const [employmentType, setEmploymentType] = useState('Full-time');
   const [reportingManagerId, setReportingManagerId] = useState('');
+  const [profilePhoto, setProfilePhoto] = useState(null);
 
   // Optional Accordion state
   const [showDocAccordion, setShowDocAccordion] = useState(false);
@@ -127,11 +128,15 @@ export default function CreateEmployee() {
           employmentType,
           reportingManagerId: reportingManagerId || null,
           password,
-          mustChangePassword
+          mustChangePassword,
+          profilePhoto
         })
       });
 
-      setWelcomeCardData(res.welcomeCard);
+      setWelcomeCardData({
+        ...res.welcomeCard,
+        profilePhotoUrl: res.welcomeCard?.profilePhotoUrl || profilePhoto
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -336,7 +341,28 @@ export default function CreateEmployee() {
                   <div style={{ padding: '1rem', background: 'var(--apc-surface)' }}>
                     <div className="apc-form-group">
                       <label>Profile Photo</label>
-                      <input type="file" accept="image/*" className="apc-input" />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="apc-input"
+                          onChange={e => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setProfilePhoto(reader.result);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                        {profilePhoto && (
+                          <img
+                            src={profilePhoto}
+                            alt="Preview"
+                            style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--apc-primary)' }}
+                          />
+                        )}
+                      </div>
                     </div>
                     <div className="apc-form-group">
                       <label>Aadhaar Card (PDF / Image)</label>

@@ -1,18 +1,52 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 /**
- * APC Wordmark Logo component with Parrot silhouette concept on the 'P'.
- * Supports 3 lockups:
- *  - 'full' (default): Full APC wordmark + Subtitle
- *  - 'monogram': "AP" badge icon for avatars
- *  - 'icon': "A" app icon in a rounded square
+ * Global Logo component for AP Corporation Attendance System.
+ * Automatically checks for custom PNG logo at '/logo.png' (placed in public directory),
+ * and gracefully falls back to the stylized APC brand lockup if no PNG logo is present.
  */
-export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = true }) {
+export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = true, customSrc }) {
+  const [imgError, setImgError] = useState(false);
+  const logoPath = customSrc || '/logo.png';
+
   const isSmall = size === 'small';
   const isLarge = size === 'large';
-
   const fontSize = isLarge ? '2.2rem' : isSmall ? '1.2rem' : '1.5rem';
+  const imageHeight = isLarge ? '48px' : isSmall ? '32px' : '40px';
 
+  // If custom PNG logo is available and hasn't failed loading
+  if (!imgError) {
+    return (
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+        <img
+          src={logoPath}
+          alt="Company Logo"
+          onError={() => setImgError(true)}
+          style={{
+            height: imageHeight,
+            width: 'auto',
+            maxHeight: imageHeight,
+            objectFit: 'contain'
+          }}
+        />
+        {lockup === 'full' && showSubtitle && (
+          <span
+            style={{
+              fontSize: isSmall ? '0.65rem' : '0.72rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              color: '#75706A'
+            }}
+          >
+            Attendance
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Fallback APC Lockups if PNG logo is not available
   if (lockup === 'icon') {
     return (
       <div
@@ -25,7 +59,7 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
           alignItems: 'center',
           justifyContent: 'center',
           color: '#1A1612',
-          fontFamily: 'Inter',
+          fontFamily: 'Inter, sans-serif',
           fontWeight: 900,
           fontStyle: 'italic',
           fontSize: isLarge ? '1.8rem' : isSmall ? '1rem' : '1.4rem',
@@ -49,7 +83,7 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
           alignItems: 'center',
           gap: '4px',
           color: '#D9880F',
-          fontFamily: 'Inter',
+          fontFamily: 'Inter, sans-serif',
           fontWeight: 900,
           fontStyle: 'italic',
           fontSize: isSmall ? '0.9rem' : '1.1rem'
@@ -73,7 +107,7 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
           alignItems: 'center',
           justifyContent: 'center',
           color: '#1A1612',
-          fontFamily: 'Inter',
+          fontFamily: 'Inter, sans-serif',
           fontWeight: 900,
           fontStyle: 'italic',
           fontSize: isLarge ? '1.5rem' : isSmall ? '0.9rem' : '1.2rem',
@@ -86,7 +120,7 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
         <div
           style={{
-            fontFamily: 'Inter',
+            fontFamily: 'Inter, sans-serif',
             fontWeight: 900,
             fontStyle: 'italic',
             fontSize: fontSize,
@@ -97,7 +131,6 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
           }}
         >
           <span>A</span>
-          {/* P with parrot beak curve */}
           <span style={{ position: 'relative', color: '#D9880F', margin: '0 1px' }}>
             P
             <svg

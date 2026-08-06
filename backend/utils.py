@@ -1,7 +1,10 @@
+import os
+import base64
 import re
 import random
 import string
 from datetime import datetime, time, timezone, timedelta
+from flask import current_app
 from models import db, Employee, AttendanceRule, AuditLog, Holiday
 
 # IST Timezone (+05:30) for AP Corporation operations
@@ -148,3 +151,23 @@ def log_audit(actor_id: str, actor_name: str, action: str, target_type: str, tar
     except Exception as e:
         db.session.rollback()
         print(f"Audit log error: {e}")
+
+
+def save_base64_photo(base64_str, folder_name='uploads'):
+    """Decodes base64 photo string and saves to uploads folder."""
+    if not base64_str:
+        return None
+    try:
+        if ',' in base64_str:
+            base64_str = base64_str.split(',')[1]
+        image_data = base64.b64decode(base64_str)
+        filename = f"{folder_name}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
+        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, 'wb') as f:
+            f.write(image_data)
+        return f"/uploads/{filename}"
+    except Exception as e:
+        print(f"Error saving photo: {e}")
+        return None
+

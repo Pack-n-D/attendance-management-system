@@ -193,6 +193,10 @@ export default function Profile() {
               <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', display: 'block' }}>EMPLOYMENT TYPE</span>
               <strong>{emp?.employmentType}</strong>
             </div>
+            <div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', display: 'block' }}>REPORTING MANAGER</span>
+              <strong style={{ color: 'var(--apc-primary-dark)' }}>{emp?.reportingManagerName || 'Super Admin'}</strong>
+            </div>
           </div>
         </div>
 

@@ -169,5 +169,52 @@ class APCTestSuite(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn('auditLogs', res.get_json())
 
+    def test_11_leave_workflow_and_manager_approval(self):
+        # 1. Login as Shivnath Gosavi
+        res_shiv = self.client.post('/api/auth/login', json={
+            'identifier': 'shivnath@apc.com',
+            'password': 'Password@123'
+        })
+        self.assertEqual(res_shiv.status_code, 200)
+        shiv_token = res_shiv.get_json()['token']
+        shiv_headers = {'Authorization': f"Bearer {shiv_token}"}
+
+        # 2. Shivnath applies for 2-day leave
+        res_apply = self.client.post('/api/employee/leave-requests', json={
+            'startDate': '2026-08-10',
+            'endDate': '2026-08-11',
+            'leaveType': 'Paid Leave',
+            'reason': 'Family Event'
+        }, headers=shiv_headers)
+        self.assertEqual(res_apply.status_code, 201)
+        req_data = res_apply.get_json()['leaveRequest']
+        self.assertEqual(req_data['status'], 'pending')
+        self.assertEqual(req_data['reportingManagerId'], 'KA-MU-95-0001')
+        req_id = req_data['id']
+
+        # 3. Login as Karan Muntode (Reporting Manager)
+        res_karan = self.client.post('/api/auth/login', json={
+            'identifier': 'karan@apc.com',
+            'password': 'Password@123'
+        })
+        self.assertEqual(res_karan.status_code, 200)
+        karan_token = res_karan.get_json()['token']
+        karan_headers = {'Authorization': f"Bearer {karan_token}"}
+
+        # 4. Karan fetches managed leave requests
+        res_managed = self.client.get('/api/employee/managed-leave-requests', headers=karan_headers)
+        self.assertEqual(res_managed.status_code, 200)
+        managed_list = res_managed.get_json()['leaveRequests']
+        self.assertTrue(any(r['id'] == req_id for r in managed_list))
+
+        # 5. Karan approves Shivnath's leave request
+        res_review = self.client.post(f'/api/employee/leave-requests/{req_id}/review', json={
+            'action': 'approve',
+            'comment': 'Approved by Team Lead'
+        }, headers=karan_headers)
+        self.assertEqual(res_review.status_code, 200)
+        self.assertEqual(res_review.get_json()['leaveRequest']['status'], 'approved')
+
 if __name__ == '__main__':
     unittest.main()
+
