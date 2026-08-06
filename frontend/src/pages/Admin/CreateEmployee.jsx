@@ -43,7 +43,7 @@ export default function CreateEmployee() {
     // Fetch potential reporting managers
     apiFetch('/admin/employees')
       .then(res => setManagers(res.employees || []))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Update preview ID on Step 1 input changes
@@ -54,7 +54,7 @@ export default function CreateEmployee() {
         body: JSON.stringify({ firstName, lastName, dob })
       })
         .then(res => setGeneratedId(res.employeeId))
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [firstName, lastName, dob]);
 

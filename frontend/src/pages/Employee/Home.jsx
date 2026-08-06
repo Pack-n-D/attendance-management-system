@@ -22,8 +22,15 @@ export default function Home() {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
 
+  // Live ticking clock state
+  const [liveTime, setLiveTime] = useState(new Date());
+
   useEffect(() => {
     fetchTodayStatus();
+    const timer = setInterval(() => {
+      setLiveTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const fetchTodayStatus = async () => {
@@ -142,6 +149,28 @@ export default function Home() {
     <>
       <Navbar />
       <main className="apc-main-content" style={{ maxWidth: '600px' }}>
+        {/* Live Digital Clock Widget */}
+        <div
+          className="apc-card"
+          style={{
+            textAlign: 'center',
+            padding: '1rem',
+            marginBottom: '1rem',
+            background: 'linear-gradient(135deg, rgba(245, 166, 35, 0.08) 0%, rgba(200, 120, 20, 0.02) 100%)',
+            border: '1px solid rgba(245, 166, 35, 0.25)'
+          }}
+        >
+          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--apc-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+            <Clock size={15} color="var(--apc-primary-dark)" /> LIVE SYSTEM TIME (IST)
+          </div>
+          <div style={{ fontSize: '2.1rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--apc-text-primary)', marginTop: '0.2rem' }}>
+            {liveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+          </div>
+          <div style={{ fontSize: '0.82rem', color: 'var(--apc-text-secondary)', marginTop: '0.1rem' }}>
+            {liveTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        </div>
+
         {/* Today's Status Banner Card */}
         <div className="apc-card apc-card-elevated" style={{ textAlign: 'center', padding: '2rem 1.5rem', marginBottom: '1.5rem' }}>
           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--apc-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
@@ -233,10 +262,15 @@ export default function Home() {
         {showCameraModal && (
           <div className="apc-modal-overlay">
             <div className="apc-modal" style={{ maxWidth: '480px' }}>
-              <h3 style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Camera size={20} color="var(--apc-primary-dark)" />
-                {punchType === 'in' ? 'Punch In Verification' : 'Punch Out Verification'}
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <Camera size={20} color="var(--apc-primary-dark)" />
+                  {punchType === 'in' ? 'Punch In Verification' : 'Punch Out Verification'}
+                </h3>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', background: 'var(--apc-surface)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
+                  {liveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                </span>
+              </div>
 
               {error && (
                 <div style={{ color: 'var(--apc-danger)', fontSize: '0.85rem', marginBottom: '0.75rem', fontWeight: 600 }}>

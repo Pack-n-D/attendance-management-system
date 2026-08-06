@@ -7,7 +7,7 @@ const API_BASE = import.meta.env.VITE_API_URL
 
 export async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem('apc_token');
-  
+
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {})
