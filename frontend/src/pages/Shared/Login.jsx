@@ -36,13 +36,13 @@ export default function Login() {
   };
 
   const handleFillDemoAdmin = () => {
-    setIdentifier('admin@apc.com');
+    setIdentifier('SUPERADMIN01');
     setPassword('Admin@123');
   };
 
   const handleFillDemoEmployee = () => {
-    setIdentifier('JO-DO-99-0001');
-    setPassword('Employee@123');
+    setIdentifier('karan@apc.com');
+    setPassword('Password@123');
   };
 
   return (

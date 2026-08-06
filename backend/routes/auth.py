@@ -19,19 +19,19 @@ def login():
         if not identifier or not password:
             return jsonify({'error': 'Employee ID/Email and password are required'}), 400
 
-        # Search by ID or Email
+        # Case-insensitive Search by ID or Email
         employee = Employee.query.filter(
-            (Employee.id == identifier) | (Employee.email == identifier)
+            (Employee.id.ilike(identifier)) | (Employee.email.ilike(identifier))
         ).first()
 
         if not employee:
-            return jsonify({'error': 'Invalid credentials'}), 401
+            return jsonify({'error': 'Invalid credentials. Account not found.'}), 401
 
         if employee.status != 'active':
             return jsonify({'error': f'Account is {employee.status}. Please contact Super Admin.'}), 403
 
         if not check_password_hash(employee.password_hash, password):
-            return jsonify({'error': 'Invalid credentials'}), 401
+            return jsonify({'error': 'Invalid credentials. Incorrect password.'}), 401
 
         # Create tokens with claims
         additional_claims = {
@@ -43,7 +43,10 @@ def login():
         access_token = create_access_token(identity=employee.id, additional_claims=additional_claims)
         refresh_token = create_refresh_token(identity=employee.id)
 
-        log_audit(employee.id, f"{employee.first_name} {employee.last_name}", "User Logged In", "Employee", employee.id)
+        try:
+            log_audit(employee.id, f"{employee.first_name} {employee.last_name}", "User Logged In", "Employee", employee.id)
+        except Exception as log_err:
+            print(f"Audit log warning: {log_err}")
 
         return jsonify({
             'message': 'Login successful',
