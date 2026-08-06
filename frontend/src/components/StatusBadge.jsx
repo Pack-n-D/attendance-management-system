@@ -13,8 +13,8 @@ const STATUS_LABELS = {
 };
 
 export default function StatusBadge({ status }) {
-  const normalized = status ? status.toLowerCase() : 'absent';
-  const label = STATUS_LABELS[normalized] || normalized.replace('_', ' ');
+  const normalized = status ? String(status).toLowerCase() : 'absent';
+  const label = STATUS_LABELS[normalized] || String(normalized).replace('_', ' ');
 
   return (
     <span className={`apc-badge apc-badge-${normalized}`}>

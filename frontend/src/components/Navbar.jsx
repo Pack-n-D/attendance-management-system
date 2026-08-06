@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import Logo from './Logo';
+import { getPhotoUrl } from '../utils/api';
 import { LogOut, User, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,6 +14,16 @@ export default function Navbar() {
     navigate('/login');
   };
 
+  const displayName = user
+    ? (user.fullName || `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || 'User')
+    : 'User';
+
+  const avatarInitial = user
+    ? (user.firstName || user.first_name || user.fullName || 'U')[0].toUpperCase()
+    : 'U';
+
+  const photoUrl = user?.profilePhotoUrl ? getPhotoUrl(user.profilePhotoUrl) : null;
+
   return (
     <header className="apc-header">
       <div style={{ cursor: 'pointer' }} onClick={() => navigate(user?.role === 'super_admin' ? '/admin/dashboard' : '/home')}>
@@ -24,7 +35,7 @@ export default function Navbar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', textAlign: 'right' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--apc-text-primary)' }}>
-                {user.fullName || `${user.firstName} ${user.lastName}`}
+                {displayName}
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {user.role === 'super_admin' ? (
@@ -33,7 +44,7 @@ export default function Navbar() {
                   </>
                 ) : (
                   <>
-                    <User size={12} /> {user.id} ({user.department})
+                    <User size={12} /> {user.id} ({user.department || 'General'})
                   </>
                 )}
               </span>
@@ -55,10 +66,10 @@ export default function Navbar() {
                 overflow: 'hidden'
               }}
             >
-              {user.profilePhotoUrl ? (
-                <img src={user.profilePhotoUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {photoUrl ? (
+                <img src={photoUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                user.firstName ? user.firstName[0].toUpperCase() : 'U'
+                avatarInitial
               )}
             </div>
           </div>

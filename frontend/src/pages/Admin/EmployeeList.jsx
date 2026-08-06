@@ -115,33 +115,40 @@ export default function EmployeeList() {
                 ) : employees.length === 0 ? (
                   <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--apc-text-secondary)' }}>No employees found matching criteria.</td></tr>
                 ) : (
-                  employees.map(emp => (
-                    <tr key={emp.id}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--apc-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', overflow: 'hidden' }}>
-                            {emp.profilePhotoUrl ? (
-                              <img src={getPhotoUrl(emp.profilePhotoUrl)} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              (emp.first_name || emp.fullName || 'E')[0].toUpperCase()
-                            )}
+                  employees.map(emp => {
+                    if (!emp) return null;
+                    const empName = emp.fullName || `${emp.first_name || emp.firstName || ''} ${emp.last_name || emp.lastName || ''}`.trim() || emp.id || 'Employee';
+                    const initialStr = String(emp.first_name || emp.firstName || empName || 'E');
+                    const empInitial = initialStr.charAt(0).toUpperCase() || 'E';
+                    
+                    return (
+                      <tr key={emp.id || Math.random()}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--apc-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', overflow: 'hidden' }}>
+                              {emp.profilePhotoUrl ? (
+                                <img src={getPhotoUrl(emp.profilePhotoUrl)} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                empInitial
+                              )}
+                            </div>
+                            <strong>{empName}</strong>
                           </div>
-                          <strong>{emp.fullName}</strong>
-                        </div>
-                      </td>
-                      <td><code style={{ fontWeight: 'bold', color: 'var(--apc-primary-dark)' }}>{emp.id}</code></td>
-                      <td>{emp.designation}</td>
-                      <td>{emp.department}</td>
-                      <td>{emp.phone}</td>
-                      <td><StatusBadge status={emp.status} /></td>
-                      <td><StatusBadge status={emp.todayAttendanceStatus} /></td>
-                      <td>
-                        <button onClick={() => navigate(`/admin/employees/${emp.id}`)} className="apc-btn apc-btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}>
-                          View / Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td><code style={{ fontWeight: 'bold', color: 'var(--apc-primary-dark)' }}>{emp.id}</code></td>
+                        <td>{emp.designation || '—'}</td>
+                        <td>{emp.department || 'General'}</td>
+                        <td>{emp.phone || '—'}</td>
+                        <td><StatusBadge status={emp.status} /></td>
+                        <td><StatusBadge status={emp.todayAttendanceStatus} /></td>
+                        <td>
+                          <button onClick={() => navigate(`/admin/employees/${emp.id}`)} className="apc-btn apc-btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}>
+                            View / Edit
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
