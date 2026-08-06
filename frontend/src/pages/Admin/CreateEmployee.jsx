@@ -47,15 +47,29 @@ export default function CreateEmployee() {
       .catch(() => { });
   }, []);
 
-  // Update preview ID on Step 1 input changes
+  const getFallbackId = () => {
+    const f = (firstName.trim().substring(0, 2) || 'EM').toUpperCase();
+    const l = (lastName.trim().substring(0, 2) || 'PL').toUpperCase();
+    const yr = (dob && dob.length >= 4) ? dob.substring(2, 4) : '26';
+    return `${f}-${l}-${yr}-0001`;
+  };
+
+  // Update preview ID on Step 1 input changes immediately & fetch from backend
   useEffect(() => {
     if (firstName && lastName) {
+      const fallback = getFallbackId();
+      setGeneratedId(fallback);
+
       apiFetch('/admin/employees/generate-id', {
         method: 'POST',
         body: JSON.stringify({ firstName, lastName, dob })
       })
-        .then(res => setGeneratedId(res.employeeId))
-        .catch(() => { });
+        .then(res => {
+          if (res.employeeId) setGeneratedId(res.employeeId);
+        })
+        .catch(() => {
+          setGeneratedId(fallback);
+        });
     }
   }, [firstName, lastName, dob]);
 
@@ -308,8 +322,9 @@ export default function CreateEmployee() {
                   <label htmlFor="reportingManager">Reporting Manager (Optional)</label>
                   <select id="reportingManager" className="apc-select" value={reportingManagerId} onChange={e => setReportingManagerId(e.target.value)}>
                     <option value="">None / Direct Report</option>
-                    {managers.map(m => (
-                      <option key={m.id} value={m.id}>{m.fullName} ({m.designation})</option>
+                    <option value="SUPERADMIN01">APC Admin (Platform Super Admin)</option>
+                    {managers.filter(m => m.id !== 'SUPERADMIN01').map(m => (
+                      <option key={m.id} value={m.id}>{m.fullName} ({m.designation || 'Manager'})</option>
                     ))}
                   </select>
                 </div>
@@ -319,44 +334,33 @@ export default function CreateEmployee() {
               <div style={{ border: '1px solid var(--apc-border)', borderRadius: 'var(--apc-radius-sm)', overflow: 'hidden', marginTop: '1rem' }}>
                 <button
                   type="button"
-                  onClick={() => setShowDocAccordion(!showDocAccordion)}
+                  onClick={() => setShowDocsAccordion(!showDocsAccordion)}
                   style={{
                     width: '100%',
-                    padding: '0.75rem 1rem',
+                    padding: '0.85rem 1rem',
                     background: 'var(--apc-bg)',
                     border: 'none',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
+                    cursor: 'pointer',
                     fontWeight: 600,
                     fontSize: '0.9rem',
-                    cursor: 'pointer'
+                    color: 'var(--apc-text-primary)'
                   }}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <FileText size={16} color="var(--apc-primary-dark)" /> Documents (Optional Uploads)
                   </span>
-                  {showDocAccordion ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  {showDocsAccordion ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
 
-                {showDocAccordion && (
-                  <div style={{ padding: '1rem', background: 'var(--apc-surface)' }}>
+                {showDocsAccordion && (
+                  <div style={{ padding: '1rem', background: '#FFFFFF', borderTop: '1px solid var(--apc-border)' }}>
                     <div className="apc-form-group">
                       <label>Profile Photo</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="apc-input"
-                          onChange={e => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => setProfilePhoto(reader.result);
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
+                        <input type="file" accept="image/*" className="apc-input" onChange={handlePhotoUpload} />
                         {profilePhoto && (
                           <img
                             src={profilePhoto}
@@ -394,7 +398,7 @@ export default function CreateEmployee() {
                 </label>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
                   <code style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--apc-text-primary)' }}>
-                    {generatedId}
+                    {generatedId || getFallbackId()}
                   </code>
                   <button type="button" onClick={handleCopyId} className="apc-btn apc-btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}>
                     {copiedId ? <Check size={14} color="var(--apc-success)" /> : <Copy size={14} />} {copiedId ? 'Copied' : 'Copy'}
