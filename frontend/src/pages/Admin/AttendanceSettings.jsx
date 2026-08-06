@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch } from '../../utils/api';
-import { Settings, Clock, Plus, Trash2, Save, Info } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Settings, Clock, Plus, Trash2, Save, Info, KeyRound } from 'lucide-react';
 
 export default function AttendanceSettings() {
+  const navigate = useNavigate();
   const [idealPunchInTime, setIdealPunchInTime] = useState('09:30');
   const [idealPunchOutTime, setIdealPunchOutTime] = useState('18:30');
   const [bufferMinutesIn, setBufferMinutesIn] = useState(15);
@@ -335,6 +337,22 @@ export default function AttendanceSettings() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* SUPER ADMIN PASSWORD & ACCOUNT SECURITY CARD */}
+          <div className="apc-card" style={{ marginBottom: '1.5rem', borderLeft: '4px solid var(--apc-primary)' }}>
+            <h3 style={{ fontSize: '1.15rem', color: 'var(--apc-text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <KeyRound size={18} color="var(--apc-primary-dark)" /> Super Admin Password & Account Security
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)', marginBottom: '1rem' }}>
+              Update your Super Admin account password securely. You can change your password anytime to protect administrative access.
+            </p>
+            <button
+              onClick={() => navigate('/profile/change-password')}
+              className="apc-btn apc-btn-primary"
+            >
+              <KeyRound size={16} /> Change Super Admin Password
+            </button>
           </div>
 
           {/* SYSTEM MAINTENANCE & DATA CLEANUP CARD */}

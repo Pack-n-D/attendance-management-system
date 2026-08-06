@@ -4,7 +4,7 @@ import StatusBadge from '../../components/StatusBadge';
 import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch, exportAttendanceCSV, getPhotoUrl } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, Search, Download } from 'lucide-react';
+import { PlusCircle, Search, Download, Trash2 } from 'lucide-react';
 
 export default function EmployeeList() {
   const [employees, setEmployees] = useState([]);
@@ -37,6 +37,18 @@ export default function EmployeeList() {
 
   const handleExportCSV = () => {
     exportAttendanceCSV();
+  };
+
+  const handleDeleteEmployee = async (empId, empName) => {
+    if (!window.confirm(`Are you sure you want to permanently delete employee ${empName} (${empId})? All attendance records for this employee will also be deleted.`)) {
+      return;
+    }
+    try {
+      await apiFetch(`/admin/employees/${empId}`, { method: 'DELETE' });
+      fetchEmployees();
+    } catch (err) {
+      alert("Delete failed: " + err.message);
+    }
   };
 
   return (
@@ -142,9 +154,21 @@ export default function EmployeeList() {
                         <td><StatusBadge status={emp.status} /></td>
                         <td><StatusBadge status={emp.todayAttendanceStatus} /></td>
                         <td>
-                          <button onClick={() => navigate(`/admin/employees/${emp.id}`)} className="apc-btn apc-btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}>
-                            View / Edit
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                            <button onClick={() => navigate(`/admin/employees/${emp.id}`)} className="apc-btn apc-btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}>
+                              View / Edit
+                            </button>
+                            {emp.role !== 'super_admin' && emp.id !== 'SUPERADMIN01' && (
+                              <button
+                                onClick={() => handleDeleteEmployee(emp.id, empName)}
+                                className="apc-btn apc-btn-danger"
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
+                                title="Delete Employee"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

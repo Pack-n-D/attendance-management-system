@@ -326,6 +326,37 @@ def toggle_employee_status(id):
     }), 200
 
 
+@admin_bp.route('/employees/<id>', methods=['DELETE'])
+def delete_employee(id):
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    employee = Employee.query.get(id)
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+
+    if employee.role == 'super_admin' or employee.id == 'SUPERADMIN01':
+        return jsonify({'error': 'Super Admin account cannot be deleted.'}), 403
+
+    try:
+        emp_name = f"{employee.first_name} {employee.last_name}"
+        # Delete associated records
+        AttendanceRecord.query.filter_by(employee_id=id).delete()
+        LeaveRequest.query.filter_by(employee_id=id).delete()
+        Document.query.filter_by(employee_id=id).delete()
+        
+        db.session.delete(employee)
+        db.session.commit()
+
+        log_audit(admin_id, admin_name, f"Deleted Employee record {id} ({emp_name})", "Employee", id)
+
+        return jsonify({'message': f"Employee {emp_name} ({id}) deleted successfully."}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f"Failed to delete employee: {str(e)}"}), 500
+
+
 # --- ADMIN LEAVE MANAGEMENT ---
 
 @admin_bp.route('/leave-requests', methods=['GET'])

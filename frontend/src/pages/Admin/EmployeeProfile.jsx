@@ -3,7 +3,7 @@ import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
 import { apiFetch, exportAttendanceCSV } from '../../utils/api';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, FileText, Calendar, Key, RefreshCw, Power, Download, Save, Check } from 'lucide-react';
+import { ArrowLeft, User, FileText, Calendar, Key, RefreshCw, Power, Download, Save, Check, Trash2 } from 'lucide-react';
 
 export default function EmployeeProfile() {
   const { id } = useParams();
@@ -20,6 +20,18 @@ export default function EmployeeProfile() {
 
   // Reset password popup
   const [resetModalData, setResetModalData] = useState(null);
+
+  const handleDeleteProfile = async () => {
+    if (!window.confirm(`Are you sure you want to permanently delete employee ${emp?.fullName} (${emp?.id})? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await apiFetch(`/admin/employees/${id}`, { method: 'DELETE' });
+      navigate('/admin/employees');
+    } catch (err) {
+      alert("Delete failed: " + err.message);
+    }
+  };
 
   useEffect(() => {
     fetchProfileDetail();
@@ -92,16 +104,24 @@ export default function EmployeeProfile() {
     <>
       <Navbar />
       <main className="apc-main-content">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-          <button onClick={() => navigate('/admin/employees')} className="apc-btn apc-btn-secondary" style={{ padding: '0.4rem 0.6rem' }}>
-            <ArrowLeft size={16} /> Back to Directory
-          </button>
-          <div>
-            <h1 style={{ fontSize: '1.5rem' }}>{emp?.fullName}</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)' }}>
-              Employee ID: <strong style={{ fontFamily: 'monospace' }}>{emp?.id}</strong> · {emp?.department}
-            </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button onClick={() => navigate('/admin/employees')} className="apc-btn apc-btn-secondary" style={{ padding: '0.4rem 0.6rem' }}>
+              <ArrowLeft size={16} /> Back to Directory
+            </button>
+            <div>
+              <h1 style={{ fontSize: '1.5rem' }}>{emp?.fullName}</h1>
+              <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)' }}>
+                Employee ID: <strong style={{ fontFamily: 'monospace' }}>{emp?.id}</strong> · {emp?.department}
+              </p>
+            </div>
           </div>
+
+          {emp?.role !== 'super_admin' && emp?.id !== 'SUPERADMIN01' && (
+            <button onClick={handleDeleteProfile} className="apc-btn apc-btn-danger">
+              <Trash2 size={16} /> Delete Employee Record
+            </button>
+          )}
         </div>
 
         {/* Profile Tabs Navigation */}

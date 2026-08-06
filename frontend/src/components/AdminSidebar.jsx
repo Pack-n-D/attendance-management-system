@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { TrendingUp, Users, PlusCircle, FileSpreadsheet, Settings, Clock } from 'lucide-react';
+import { TrendingUp, Users, PlusCircle, FileSpreadsheet, Settings, Clock, KeyRound } from 'lucide-react';
 
 export default function AdminSidebar() {
   const location = useLocation();
@@ -12,6 +12,7 @@ export default function AdminSidebar() {
     { path: '/admin/employees/new', label: 'Create Employee', icon: PlusCircle },
     { path: '/admin/attendance', label: 'Attendance Log', icon: FileSpreadsheet },
     { path: '/admin/settings/attendance-rules', label: 'Attendance Rules', icon: Settings },
+    { path: '/profile/change-password', label: 'Change Password', icon: KeyRound },
     { path: '/admin/audit-log', label: 'Audit Log', icon: Clock }
   ];
 
