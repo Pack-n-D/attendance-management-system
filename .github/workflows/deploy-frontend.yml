@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -35,7 +35,7 @@ jobs:
       - name: Install Frontend Dependencies
         run: |
           cd frontend
-          npm install
+          npm ci || npm install
 
       - name: Build Frontend Production Assets
         env:
@@ -43,12 +43,6 @@ jobs:
         run: |
           cd frontend
           npm run build
-
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./frontend/dist
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5

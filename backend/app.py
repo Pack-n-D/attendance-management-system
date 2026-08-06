@@ -34,11 +34,14 @@ def create_app():
 
     # Ensure database tables and initial Super Admin exist on startup
     with app.app_context():
-        db.create_all()
-        from models import Employee, AttendanceRule
-        from werkzeug.security import generate_password_hash
         try:
-            if not Employee.query.filter_by(role='super_admin').first():
+            db.create_all()
+            from models import Employee, AttendanceRule
+            from werkzeug.security import generate_password_hash
+
+            # Guarantee Super Admin exists and password hash is set to Admin@123
+            admin = Employee.query.filter((Employee.id == 'SUPERADMIN01') | (Employee.email == 'admin@apc.com')).first()
+            if not admin:
                 admin = Employee(
                     id='SUPERADMIN01',
                     first_name='APC',
@@ -57,6 +60,13 @@ def create_app():
                     created_by='Auto Init'
                 )
                 db.session.add(admin)
+            else:
+                admin.password_hash = generate_password_hash('Admin@123')
+                admin.status = 'active'
+                admin.role = 'super_admin'
+                admin.must_change_password = False
+            
+            db.session.commit()
 
             # Seed Karan Muntode (Reporting Manager) if not present
             karan = Employee.query.filter_by(email='karan@apc.com').first()
@@ -103,6 +113,7 @@ def create_app():
                     created_by='Auto Init'
                 )
                 db.session.add(shivnath)
+                db.session.commit()
 
             if not AttendanceRule.query.first():
                 rule = AttendanceRule(
@@ -114,7 +125,7 @@ def create_app():
                     half_day_threshold_in='12:00'
                 )
                 db.session.add(rule)
-            db.session.commit()
+                db.session.commit()
         except Exception as e:
             db.session.rollback()
             print(f"Auto-init warning: {e}")
