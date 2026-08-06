@@ -176,6 +176,11 @@ def create_employee():
     if not valid_pass:
         return jsonify({'error': pass_msg}), 400
 
+    email = data['email'].strip().lower()
+    existing_emp = Employee.query.filter_by(email=email).first()
+    if existing_emp:
+        return jsonify({'error': f"An employee with email '{email}' already exists in the system."}), 400
+
     # Save profile photo if provided
     profile_photo_b64 = data.get('profilePhoto') or data.get('photo')
     photo_url = save_base64_photo(profile_photo_b64, folder_name=f"avatar_{emp_id}") if profile_photo_b64 else None
@@ -186,7 +191,7 @@ def create_employee():
         first_name=data['firstName'].strip(),
         last_name=data['lastName'].strip(),
         phone=data['phone'].strip(),
-        email=data['email'].strip().lower(),
+        email=email,
         dob=data['dob'],
         date_of_joining=data['dateOfJoining'],
         designation=data['designation'].strip(),
@@ -201,8 +206,12 @@ def create_employee():
         created_by=admin_name
     )
 
-    db.session.add(employee)
-    db.session.commit()
+    try:
+        db.session.add(employee)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f"Could not create employee: {str(e)}"}), 400
 
     log_audit(admin_id, admin_name, f"Created Employee {employee.first_name} {employee.last_name}", "Employee", employee.id)
 
