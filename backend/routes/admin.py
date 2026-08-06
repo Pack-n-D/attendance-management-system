@@ -419,3 +419,39 @@ def admin_review_leave_request(req_id):
 def get_audit_logs():
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(200).all()
     return jsonify({'auditLogs': [l.to_dict() for l in logs]}), 200
+
+
+# --- SYSTEM RESET ---
+@admin_bp.route('/reset-database', methods=['POST'])
+def reset_database():
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+
+    if not admin_user or admin_user.role != 'super_admin':
+        return jsonify({'error': 'Unauthorized. Super Admin role required.'}), 403
+
+    try:
+        # Delete test records
+        AttendanceRecord.query.delete()
+        LeaveRequest.query.delete()
+        Document.query.delete()
+        AuditLog.query.delete()
+        
+        # Remove non-super-admin employees
+        Employee.query.filter(Employee.role != 'super_admin').delete()
+        
+        # Preserve & refresh Super Admin credentials
+        admin_user.password_hash = generate_password_hash('Admin@123')
+        admin_user.must_change_password = False
+        admin_user.status = 'active'
+
+        db.session.commit()
+
+        log_audit(admin_id, f"{admin_user.first_name} {admin_user.last_name}", "Database Reset Performed - Cleaned Test Entries", "System", admin_id)
+
+        return jsonify({
+            'message': 'Database cleaned successfully! All dummy test entries have been removed. Super Admin remains active with password Admin@123.'
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Database reset failed: {str(e)}'}), 500

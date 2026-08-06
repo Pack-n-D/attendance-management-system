@@ -19,6 +19,24 @@ export default function AttendanceSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [resettingDb, setResettingDb] = useState(false);
+
+  const handleResetDatabase = async () => {
+    if (!window.confirm("ARE YOU SURE? This will permanently delete all test employees, attendance records, and leave logs. Only the Super Admin (SUPERADMIN01 / Admin@123) will remain.")) {
+      return;
+    }
+    setResettingDb(true);
+    try {
+      const res = await apiFetch('/admin/reset-database', { method: 'POST' });
+      setSuccessMsg(res.message);
+      setTimeout(() => setSuccessMsg(''), 6000);
+      fetchRulesAndHolidays();
+    } catch (err) {
+      alert("Reset failed: " + err.message);
+    } finally {
+      setResettingDb(false);
+    }
+  };
 
   useEffect(() => {
     fetchRulesAndHolidays();
@@ -317,6 +335,23 @@ export default function AttendanceSettings() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* SYSTEM MAINTENANCE & DATA CLEANUP CARD */}
+          <div className="apc-card" style={{ borderLeft: '4px solid var(--apc-danger)' }}>
+            <h3 style={{ fontSize: '1.15rem', color: 'var(--apc-danger)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Trash2 size={18} /> System Maintenance & Database Cleanup
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)', marginBottom: '1rem' }}>
+              Wipe out all temporary test employees, attendance logs, and dummy leave requests. Only the Super Admin (<strong>SUPERADMIN01</strong> / <strong>Admin@123</strong>) will remain active.
+            </p>
+            <button
+              onClick={handleResetDatabase}
+              className="apc-btn apc-btn-danger"
+              disabled={resettingDb}
+            >
+              {resettingDb ? 'Cleaning Database...' : 'Clean Test Data & Reset Database'}
+            </button>
           </div>
         </main>
       </div>
