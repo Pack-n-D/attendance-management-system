@@ -3,6 +3,7 @@ import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
 import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch, exportAttendanceCSV, getPhotoUrl } from '../../utils/api';
+import { DEPARTMENTS } from '../../utils/constants';
 import { useNavigate } from 'react-router-dom';
 import { PlusCircle, Search, Download, Trash2 } from 'lucide-react';
 
@@ -91,11 +92,9 @@ export default function EmployeeList() {
 
               <select className="apc-select" value={department} onChange={e => setDepartment(e.target.value)}>
                 <option value="">All Departments</option>
-                <option value="Creative">Creative</option>
-                <option value="Client Servicing">Client Servicing</option>
-                <option value="Media Buying">Media Buying</option>
-                <option value="Finance">Finance</option>
-                <option value="HR">HR</option>
+                {DEPARTMENTS.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
               </select>
 
               <select className="apc-select" value={status} onChange={e => setStatus(e.target.value)}>

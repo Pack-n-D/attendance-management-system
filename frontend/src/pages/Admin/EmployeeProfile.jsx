@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
 import { apiFetch, exportAttendanceCSV } from '../../utils/api';
+import { DEPARTMENTS } from '../../utils/constants';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, FileText, Calendar, Key, RefreshCw, Power, Download, Save, Check, Trash2 } from 'lucide-react';
 
@@ -217,21 +218,9 @@ export default function EmployeeProfile() {
                 <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', display: 'block' }}>DEPARTMENT</span>
                 {editingOverview ? (
                   <select className="apc-select" value={form.department || ''} onChange={e => setForm({ ...form, department: e.target.value })}>
-                    <option value="Creative">Creative</option>
-                    <option value="CRM">CRM</option>
-                    <option value="SCM">SCM</option>
-                    <option value="Finance">Finance</option>
-                    <option value="HR">HR</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Sales">Sales</option>
-                    <option value="Operations">Operations</option>
-                    <option value="Product">Product</option>
-                    <option value="Digital Marketing">Digital Marketing</option>
-                    <option value="Management">Management</option>
-                    <option value="Designing">Designing</option>
-                    <option value="Admin">Admin</option>
-
-
+                    {DEPARTMENTS.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
                   </select>
                 ) : (
                   <strong>{emp?.department}</strong>

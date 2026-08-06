@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import WelcomeCardModal from '../../components/WelcomeCardModal';
 import { apiFetch } from '../../utils/api';
+import { DEPARTMENTS } from '../../utils/constants';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ArrowLeft, RefreshCw, Eye, EyeOff, Copy, Check, Lock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -325,13 +326,9 @@ export default function CreateEmployee() {
                 <div className="apc-form-group">
                   <label htmlFor="department">Department <span className="required">*</span></label>
                   <select id="department" className="apc-select" value={department} onChange={e => setDepartment(e.target.value)}>
-                    <option value="Creative">Creative</option>
-                    <option value="Client Servicing">Client Servicing</option>
-                    <option value="Media Buying">Media Buying</option>
-                    <option value="Finance">Finance</option>
-                    <option value="HR">HR</option>
-                    <option value="Development">IT</option>
-                    <option value="Marketing">Marketing</option>
+                    {DEPARTMENTS.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
                   </select>
                 </div>
 
