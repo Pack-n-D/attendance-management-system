@@ -43,6 +43,14 @@ def create_app():
     with app.app_context():
         try:
             db.create_all()
+
+            # Automatic non-destructive schema migration for profile_photo_url column to TEXT
+            try:
+                db.session.execute(db.text("ALTER TABLE employees ALTER COLUMN profile_photo_url TYPE TEXT;"))
+                db.session.commit()
+            except Exception as alter_err:
+                db.session.rollback()
+
             from models import Employee, AttendanceRule
             from werkzeug.security import generate_password_hash
 
