@@ -38,16 +38,10 @@ def update_profile_photo():
         return jsonify({'error': 'Photo payload is missing'}), 400
 
     try:
-        if ',' in photo_base64:
-            photo_base64 = photo_base64.split(',')[1]
-        image_data = base64.b64decode(photo_base64)
-        filename = f"avatar_{user_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jpg"
-        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        with open(filepath, 'wb') as f:
-            f.write(image_data)
+        photo_url = save_base64_photo(photo_base64, folder_name=f"avatar_{user_id}", return_data_uri=True)
+        if not photo_url:
+            return jsonify({'error': 'Invalid photo format'}), 400
 
-        photo_url = f"/uploads/{filename}"
         employee.profile_photo_url = photo_url
         db.session.commit()
 
@@ -58,6 +52,7 @@ def update_profile_photo():
             'profilePhotoUrl': photo_url
         }), 200
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': f'Failed to upload photo: {str(e)}'}), 500
 
 

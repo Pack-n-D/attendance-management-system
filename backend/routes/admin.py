@@ -270,6 +270,12 @@ def update_employee(id):
     if 'department' in data: employee.department = data['department'].strip()
     if 'employmentType' in data: employee.employment_type = data['employmentType']
     if 'reportingManagerId' in data: employee.reporting_manager_id = data['reportingManagerId']
+    
+    photo_payload = data.get('profilePhoto') or data.get('photo')
+    if photo_payload:
+        new_photo_url = save_base64_photo(photo_payload, folder_name=f"avatar_{id}", return_data_uri=True)
+        if new_photo_url:
+            employee.profile_photo_url = new_photo_url
 
     db.session.commit()
 
@@ -279,6 +285,42 @@ def update_employee(id):
         'message': 'Employee updated successfully',
         'employee': employee.to_dict()
     }), 200
+
+
+@admin_bp.route('/employees/<id>/photo', methods=['POST', 'PUT'])
+def update_employee_photo_admin(id):
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    employee = Employee.query.get(id)
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+
+    data = request.get_json() or {}
+    photo_base64 = data.get('photo') or data.get('profilePhoto')
+
+    if not photo_base64:
+        return jsonify({'error': 'Photo payload is missing'}), 400
+
+    try:
+        photo_url = save_base64_photo(photo_base64, folder_name=f"avatar_{id}", return_data_uri=True)
+        if not photo_url:
+            return jsonify({'error': 'Invalid photo format'}), 400
+
+        employee.profile_photo_url = photo_url
+        db.session.commit()
+
+        log_audit(admin_id, admin_name, f"Updated Profile Photo for Employee {employee.first_name} {employee.last_name}", "Employee", id)
+
+        return jsonify({
+            'message': 'Employee profile photo updated successfully',
+            'profilePhotoUrl': photo_url
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to update photo: {str(e)}'}), 500
+
 
 
 @admin_bp.route('/employees/<id>/reset-password', methods=['POST'])

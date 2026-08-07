@@ -1,5 +1,6 @@
 import React from 'react';
 import Logo from './Logo';
+import Avatar from './Avatar';
 import { getPhotoUrl } from '../utils/api';
 import { Printer, X, User } from 'lucide-react';
 
@@ -86,40 +87,19 @@ export default function WelcomeCardModal({ data, onClose }) {
 
             {/* Right Corner: Employee Photo */}
             <div style={{
-              width: '100px',
-              height: '115px',
+              width: '95px',
+              height: '105px',
               borderRadius: '8px',
               border: '2px solid var(--apc-primary)',
               background: '#FFFFFF',
               overflow: 'hidden',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
               flexShrink: 0
             }}>
-              {photoSrc ? (
-                <img
-                  src={photoSrc}
-                  alt={data.fullName}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                <div style={{
-                  width: '100%',
-                  height: '100%',
-                  background: 'var(--apc-primary-tint)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--apc-primary-dark)'
-                }}>
-                  <User size={36} style={{ marginBottom: '4px', opacity: 0.7 }} />
-                  <span style={{ fontSize: '1rem', fontWeight: 800 }}>{initials}</span>
-                </div>
-              )}
+              <Avatar src={data.profilePhotoUrl} name={data.fullName} size={85} />
             </div>
 
           </div>

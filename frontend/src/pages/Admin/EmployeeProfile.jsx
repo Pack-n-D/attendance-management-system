@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
+import Avatar from '../../components/Avatar';
 import { apiFetch, exportAttendanceCSV } from '../../utils/api';
 import { DEPARTMENTS } from '../../utils/constants';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, FileText, Calendar, Key, RefreshCw, Power, Download, Save, Check, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, FileText, Calendar, Key, RefreshCw, Power, Download, Save, Check, Trash2, Camera } from 'lucide-react';
 
 export default function EmployeeProfile() {
   const { id } = useParams();
@@ -21,6 +22,26 @@ export default function EmployeeProfile() {
 
   // Reset password popup
   const [resetModalData, setResetModalData] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const handleAdminPhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        await apiFetch(`/admin/employees/${id}/photo`, {
+          method: 'POST',
+          body: JSON.stringify({ photo: reader.result })
+        });
+        fetchProfileDetail();
+      } catch (err) {
+        alert("Failed to upload photo: " + err.message);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleDeleteProfile = async () => {
     if (!window.confirm(`Are you sure you want to permanently delete employee ${emp?.fullName} (${emp?.id})? This action cannot be undone.`)) {
@@ -110,8 +131,32 @@ export default function EmployeeProfile() {
             <button onClick={() => navigate('/admin/employees')} className="apc-btn apc-btn-secondary" style={{ padding: '0.4rem 0.6rem' }}>
               <ArrowLeft size={16} /> Back to Directory
             </button>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <Avatar src={emp?.profilePhotoUrl} name={emp?.fullName} size={48} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  position: 'absolute',
+                  bottom: '-2px',
+                  right: '-2px',
+                  backgroundColor: 'var(--apc-primary)',
+                  border: '2px solid #FFFFFF',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Change photo for this employee"
+              >
+                <Camera size={11} color="#1A1612" />
+              </button>
+              <input type="file" ref={fileInputRef} onChange={handleAdminPhotoUpload} accept="image/*" style={{ display: 'none' }} />
+            </div>
             <div>
-              <h1 style={{ fontSize: '1.5rem' }}>{emp?.fullName}</h1>
+              <h1 style={{ fontSize: '1.5rem', margin: 0 }}>{emp?.fullName}</h1>
               <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)' }}>
                 Employee ID: <strong style={{ fontFamily: 'monospace' }}>{emp?.id}</strong> · {emp?.department}
               </p>

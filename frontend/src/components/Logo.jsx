@@ -53,18 +53,18 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Tilted Thin Oval Ring */}
+        {/* Tilted Thin Black Oval Ring */}
         <ellipse
           cx="120"
           cy="50"
           rx="106"
           ry="38"
           stroke="#1A1A1A"
-          strokeWidth="2.5"
-          transform="rotate(-11 120 50)"
+          strokeWidth="3"
+          transform="rotate(-12 120 50)"
         />
 
-        {/* Top-Left 8-Pointed Star on Ring */}
+        {/* Top-Left 8-Pointed Black Star */}
         <g transform="translate(18, 16) scale(0.65)">
           <path
             d="M 20 0 L 25 14 L 38 7 L 30 20 L 44 26 L 30 32 L 38 45 L 25 38 L 20 52 L 15 38 L 2 45 L 10 32 L -4 26 L 10 20 L 2 7 L 15 14 Z"
@@ -72,7 +72,7 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
           />
         </g>
 
-        {/* Bottom-Right 8-Pointed Star on Ring */}
+        {/* Bottom-Right 8-Pointed Black Star */}
         <g transform="translate(188, 48) scale(0.65)">
           <path
             d="M 20 0 L 25 14 L 38 7 L 30 20 L 44 26 L 30 32 L 38 45 L 25 38 L 20 52 L 15 38 L 2 45 L 10 32 L -4 26 L 10 20 L 2 7 L 15 14 Z"
@@ -80,23 +80,20 @@ export default function Logo({ lockup = 'full', size = 'medium', showSubtitle = 
           />
         </g>
 
-        {/* Center Bold Slanted Orange-Yellow APC Text */}
-        <g transform="translate(120, 50)">
-          <text
-            x="0"
-            y="18"
-            textAnchor="middle"
-            fill="#F8A71A"
-            fontFamily="Inter, 'Arial Black', -apple-system, sans-serif"
-            fontWeight="900"
-            fontStyle="italic"
-            fontSize="54"
-            letterSpacing="-1"
-            transform="skewX(-8)"
-          >
-            APC
-          </text>
-        </g>
+        {/* Forward Slanted Bold Italic Golden Orange APC Text */}
+        <text
+          x="120"
+          y="68"
+          textAnchor="middle"
+          fill="#FAA61A"
+          fontFamily="'Arial Black', 'Inter', Arial, sans-serif"
+          fontWeight="900"
+          fontStyle="italic"
+          fontSize="56"
+          letterSpacing="1"
+        >
+          APC
+        </text>
       </svg>
 
       {lockup === 'full' && showSubtitle && (

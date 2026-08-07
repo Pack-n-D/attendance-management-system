@@ -153,21 +153,42 @@ def log_audit(actor_id: str, actor_name: str, action: str, target_type: str, tar
         print(f"Audit log error: {e}")
 
 
-def save_base64_photo(base64_str, folder_name='uploads'):
-    """Decodes base64 photo string and saves to uploads folder."""
+def save_base64_photo(base64_str, folder_name='uploads', return_data_uri=True):
+    """Decodes base64 photo string, saves to disk backup, and returns persistent compressed Data URI or relative URL."""
     if not base64_str:
         return None
     try:
-        if ',' in base64_str:
-            base64_str = base64_str.split(',')[1]
-        image_data = base64.b64decode(base64_str)
+        raw_b64 = base64_str.split(',')[1] if ',' in base64_str else base64_str
+        image_data = base64.b64decode(raw_b64)
+
+        # Save to uploads folder as disk backup
         filename = f"{folder_name}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
         filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, 'wb') as f:
             f.write(image_data)
+
+        if return_data_uri:
+            # Compress image using Pillow so DB footprint stays tiny (~25KB)
+            try:
+                import io
+                from PIL import Image
+                img = Image.open(io.BytesIO(image_data))
+                img.thumbnail((300, 300))
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                buffer = io.BytesIO()
+                img.save(buffer, format="JPEG", quality=80)
+                compressed_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                return f"data:image/jpeg;base64,{compressed_b64}"
+            except Exception as pe:
+                print(f"PIL compression notice: {pe}")
+                if len(raw_b64) < 250000:
+                    prefix = "data:image/jpeg;base64," if not base64_str.startswith('data:') else ""
+                    return f"{prefix}{raw_b64}" if not base64_str.startswith('data:') else base64_str
+
         return f"/uploads/{filename}"
     except Exception as e:
         print(f"Error saving photo: {e}")
-        return None
+        return base64_str if base64_str and base64_str.startswith('data:') else None
 

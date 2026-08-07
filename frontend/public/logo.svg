@@ -1,12 +1,10 @@
 <svg viewBox="0 0 240 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <ellipse cx="120" cy="50" rx="106" ry="38" stroke="#1A1A1A" stroke-width="2.5" transform="rotate(-11 120 50)"/>
+  <ellipse cx="120" cy="50" rx="106" ry="38" stroke="#1A1A1A" stroke-width="3" transform="rotate(-12 120 50)"/>
   <g transform="translate(18, 16) scale(0.65)">
     <path d="M 20 0 L 25 14 L 38 7 L 30 20 L 44 26 L 30 32 L 38 45 L 25 38 L 20 52 L 15 38 L 2 45 L 10 32 L -4 26 L 10 20 L 2 7 L 15 14 Z" fill="#1A1A1A"/>
   </g>
   <g transform="translate(188, 48) scale(0.65)">
     <path d="M 20 0 L 25 14 L 38 7 L 30 20 L 44 26 L 30 32 L 38 45 L 25 38 L 20 52 L 15 38 L 2 45 L 10 32 L -4 26 L 10 20 L 2 7 L 15 14 Z" fill="#1A1A1A"/>
   </g>
-  <g transform="translate(120, 50)">
-    <text x="0" y="18" text-anchor="middle" fill="#F8A71A" font-family="Inter, 'Arial Black', -apple-system, sans-serif" font-weight="900" font-style="italic" font-size="54" letter-spacing="-1" transform="skewX(-8)">APC</text>
-  </g>
+  <text x="120" y="68" text-anchor="middle" fill="#FAA61A" font-family="'Arial Black', 'Inter', Arial, sans-serif" font-weight="900" font-style="italic" font-size="56" letter-spacing="1">APC</text>
 </svg>

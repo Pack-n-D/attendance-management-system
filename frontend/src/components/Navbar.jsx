@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import Logo from './Logo';
-import { getPhotoUrl } from '../utils/api';
+import Avatar from './Avatar';
 import { LogOut, User, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -58,27 +58,7 @@ export default function Navbar() {
             </div>
 
             {/* Profile Avatar */}
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--apc-primary-tint)',
-                border: '1px solid var(--apc-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                color: 'var(--apc-primary-dark)',
-                overflow: 'hidden'
-              }}
-            >
-              {photoUrl ? (
-                <img src={photoUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                avatarInitial
-              )}
-            </div>
+            <Avatar src={user?.profilePhotoUrl} name={displayName} size={36} border="1px solid var(--apc-primary)" />
           </div>
 
           <button

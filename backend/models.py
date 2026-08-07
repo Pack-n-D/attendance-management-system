@@ -19,7 +19,7 @@ class Employee(db.Model):
     reporting_manager_id = db.Column(db.String(20), db.ForeignKey('employees.id'), nullable=True)
     role = db.Column(db.String(20), nullable=False, default='employee')  # 'super_admin' or 'employee'
     status = db.Column(db.String(20), nullable=False, default='active')  # 'active', 'inactive', 'terminated'
-    profile_photo_url = db.Column(db.String(255), nullable=True)
+    profile_photo_url = db.Column(db.Text, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     must_change_password = db.Column(db.Boolean, default=True)
     created_by = db.Column(db.String(100), nullable=True)

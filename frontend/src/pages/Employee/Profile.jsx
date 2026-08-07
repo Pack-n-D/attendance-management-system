@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Navbar from '../../components/Navbar';
+import Avatar from '../../components/Avatar';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { Camera, FileText, Lock, Send, CheckCircle } from 'lucide-react';
@@ -107,28 +108,7 @@ export default function Profile() {
         {/* Profile Header Card */}
         <div className="apc-card apc-card-elevated" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
-            <div
-              style={{
-                width: '100px',
-                height: '100px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--apc-primary-tint)',
-                border: '3px solid var(--apc-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '2.5rem',
-                fontWeight: 800,
-                color: 'var(--apc-primary-dark)',
-                overflow: 'hidden'
-              }}
-            >
-              {emp?.profilePhotoUrl ? (
-                <img src={emp.profilePhotoUrl} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                emp?.firstName ? emp.firstName[0].toUpperCase() : 'E'
-              )}
-            </div>
+            <Avatar src={emp?.profilePhotoUrl} name={emp?.fullName || emp?.firstName} size={100} border="3px solid var(--apc-primary)" />
 
             <button
               onClick={() => fileInputRef.current?.click()}

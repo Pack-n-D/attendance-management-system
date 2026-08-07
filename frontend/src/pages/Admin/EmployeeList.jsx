@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
 import AdminSidebar from '../../components/AdminSidebar';
-import { apiFetch, exportAttendanceCSV, getPhotoUrl } from '../../utils/api';
+import Avatar from '../../components/Avatar';
+import { apiFetch, exportAttendanceCSV } from '../../utils/api';
 import { DEPARTMENTS } from '../../utils/constants';
 import { useNavigate } from 'react-router-dom';
 import { PlusCircle, Search, Download, Trash2 } from 'lucide-react';
@@ -136,13 +137,7 @@ export default function EmployeeList() {
                       <tr key={emp.id || Math.random()}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--apc-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', overflow: 'hidden' }}>
-                              {emp.profilePhotoUrl ? (
-                                <img src={getPhotoUrl(emp.profilePhotoUrl)} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                empInitial
-                              )}
-                            </div>
+                            <Avatar src={emp.profilePhotoUrl} name={empName} size={32} />
                             <strong>{empName}</strong>
                           </div>
                         </td>
