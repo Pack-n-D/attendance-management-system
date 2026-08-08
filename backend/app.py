@@ -44,12 +44,26 @@ def create_app():
         try:
             db.create_all()
 
-            # Automatic non-destructive schema migration for profile_photo_url column to TEXT
+            # Automatic non-destructive schema migration for profile_photo_url column to TEXT and new columns
             try:
                 db.session.execute(db.text("ALTER TABLE employees ALTER COLUMN profile_photo_url TYPE TEXT;"))
                 db.session.commit()
             except Exception as alter_err:
                 db.session.rollback()
+
+            new_cols = [
+                ("base_salary", "FLOAT DEFAULT 0.0"),
+                ("casual_leave_balance", "FLOAT DEFAULT 12.0"),
+                ("sick_leave_balance", "FLOAT DEFAULT 12.0"),
+                ("paid_leave_balance", "FLOAT DEFAULT 15.0"),
+                ("coff_balance", "FLOAT DEFAULT 0.0")
+            ]
+            for col_name, col_type in new_cols:
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE employees ADD COLUMN {col_name} {col_type};"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
 
             from models import Employee, AttendanceRule
             from werkzeug.security import generate_password_hash

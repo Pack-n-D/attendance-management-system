@@ -192,3 +192,144 @@ def save_base64_photo(base64_str, folder_name='uploads', return_data_uri=True):
         print(f"Error saving photo: {e}")
         return base64_str if base64_str and base64_str.startswith('data:') else None
 
+
+def is_holiday_or_weekly_off(date_str: str) -> tuple:
+    """
+    Checks if date_str (YYYY-MM-DD) is a Holiday or a Weekly Off.
+    Returns (is_off: bool, reason_str: str)
+    """
+    try:
+        holiday = Holiday.query.filter_by(date=date_str).first()
+        if holiday:
+            return True, f"Holiday: {holiday.label}"
+
+        dt = datetime.strptime(date_str, '%Y-%m-%d')
+        weekday_name = dt.strftime('%A')
+        
+        rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
+        if rule and rule.weekly_offs:
+            weekly_offs_list = [w.strip() for w in rule.weekly_offs.split(',')]
+            if weekday_name in weekly_offs_list:
+                return True, f"Weekly Off ({weekday_name})"
+
+        return False, ""
+    except Exception:
+        return False, ""
+
+
+def calculate_monthly_salary_slip(employee, month_str: str) -> dict:
+    """
+    Computes detailed salary slip metrics for employee for month_str 'YYYY-MM'.
+    """
+    import calendar
+    from models import AttendanceRecord
+
+    try:
+        year, month = map(int, month_str.split('-'))
+    except Exception:
+        now = get_current_now()
+        year, month = now.year, now.month
+        month_str = f"{year:04d}-{month:02d}"
+
+    days_in_month = calendar.monthrange(year, month)[1]
+    start_date_str = f"{month_str}-01"
+    end_date_str = f"{month_str}-{days_in_month:02d}"
+
+    rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
+
+    # Standard shift duration in hours
+    try:
+        ideal_in = datetime.strptime(rule.ideal_punch_in_time, '%H:%M') if rule else datetime.strptime('09:30', '%H:%M')
+        ideal_out = datetime.strptime(rule.ideal_punch_out_time, '%H:%M') if rule else datetime.strptime('18:30', '%H:%M')
+        shift_duration_hours = (ideal_out - ideal_in).seconds / 3600.0
+    except Exception:
+        shift_duration_hours = 9.0
+
+    # Count total working days in month
+    working_days = 0
+    holidays_count = 0
+    weekly_offs_count = 0
+
+    for day in range(1, days_in_month + 1):
+        d_str = f"{month_str}-{day:02d}"
+        is_off, reason = is_holiday_or_weekly_off(d_str)
+        if "Weekly Off" in reason:
+            weekly_offs_count += 1
+        elif "Holiday" in reason:
+            holidays_count += 1
+        else:
+            working_days += 1
+
+    if working_days <= 0:
+        working_days = max(1, days_in_month - weekly_offs_count)
+
+    # Fetch employee's attendance records for the month
+    records = AttendanceRecord.query.filter(
+        AttendanceRecord.employee_id == employee.id,
+        AttendanceRecord.date >= start_date_str,
+        AttendanceRecord.date <= end_date_str
+    ).all()
+
+    on_time_count = 0
+    half_day_count = 0
+    on_leave_count = 0
+    absent_count = 0
+    overtime_hours = 0.0
+
+    for r in records:
+        if r.status in ['on_time', 'in_buffer', 'late']:
+            on_time_count += 1
+        elif r.status == 'half_day':
+            half_day_count += 1
+        elif r.status == 'on_leave':
+            on_leave_count += 1
+        elif r.status == 'absent':
+            absent_count += 1
+
+        if r.punch_in_time and r.punch_out_time:
+            try:
+                t1 = datetime.strptime(r.punch_in_time, '%H:%M:%S') if len(r.punch_in_time) == 8 else datetime.strptime(r.punch_in_time, '%H:%M')
+                t2 = datetime.strptime(r.punch_out_time, '%H:%M:%S') if len(r.punch_out_time) == 8 else datetime.strptime(r.punch_out_time, '%H:%M')
+                worked_hrs = (t2 - t1).seconds / 3600.0
+                if worked_hrs > shift_duration_hours:
+                    overtime_hours += (worked_hrs - shift_duration_hours)
+            except Exception:
+                pass
+
+    base_salary = getattr(employee, 'base_salary', 0.0) or 0.0
+    present_days = on_time_count + (0.5 * half_day_count)
+    paid_leaves = on_leave_count
+
+    per_day_rate = base_salary / working_days if working_days > 0 else 0.0
+    hourly_rate = per_day_rate / 8.0 if per_day_rate > 0 else 0.0
+    overtime_rate = hourly_rate * 1.5
+    overtime_pay = overtime_hours * overtime_rate
+
+    total_covered_days = present_days + paid_leaves
+    unpaid_absent_days = max(0.0, working_days - total_covered_days)
+    unpaid_deductions = unpaid_absent_days * per_day_rate
+
+    gross_salary = base_salary + overtime_pay
+    net_salary = max(0.0, gross_salary - unpaid_deductions)
+
+    return {
+        'month': month_str,
+        'baseSalary': round(base_salary, 2),
+        'workingDays': working_days,
+        'daysInMonth': days_in_month,
+        'weeklyOffsCount': weekly_offs_count,
+        'holidaysCount': holidays_count,
+        'presentDays': present_days,
+        'halfDays': half_day_count,
+        'absentDays': absent_count,
+        'paidLeaves': paid_leaves,
+        'unpaidAbsentDays': round(unpaid_absent_days, 1),
+        'overtimeHours': round(overtime_hours, 2),
+        'overtimePay': round(overtime_pay, 2),
+        'perDayRate': round(per_day_rate, 2),
+        'unpaidDeductions': round(unpaid_deductions, 2),
+        'grossSalary': round(gross_salary, 2),
+        'netSalary': round(net_salary, 2)
+    }
+
+

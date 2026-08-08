@@ -40,15 +40,50 @@ export default function Home() {
   // Live ticking clock state
   const [liveTime, setLiveTime] = useState(new Date());
 
+  // MNC Portal state
+  const [activePortalTab, setActivePortalTab] = useState('dashboard'); // 'dashboard' or 'salary'
+  const [salaryMonth, setSalaryMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [salarySlip, setSalarySlip] = useState(null);
+  const [loadingSalary, setLoadingSalary] = useState(false);
+  const [profileData, setProfileData] = useState(null);
+
   useEffect(() => {
     fetchTodayStatus();
     fetchLeaveData();
+    fetchProfile();
 
     const timer = setInterval(() => {
       setLiveTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await apiFetch('/employee/profile');
+      if (res.employee) setProfileData(res.employee);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchMySalarySlip = async (mStr) => {
+    setLoadingSalary(true);
+    try {
+      const res = await apiFetch(`/employee/salary-slips?month=${mStr}`);
+      setSalarySlip(res.salarySlip);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingSalary(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activePortalTab === 'salary') {
+      fetchMySalarySlip(salaryMonth);
+    }
+  }, [activePortalTab, salaryMonth]);
 
   const fetchTodayStatus = async () => {
     setLoading(true);
@@ -244,6 +279,62 @@ export default function Home() {
             <Calendar size={16} /> Apply for Leave
           </button>
         </div>
+
+        {/* MNC Navigation Tabs */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--apc-border)' }}>
+          <button
+            onClick={() => setActivePortalTab('dashboard')}
+            className={`apc-btn ${activePortalTab === 'dashboard' ? 'apc-btn-primary' : 'apc-btn-secondary'}`}
+            style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '0.5rem 1rem' }}
+          >
+            <UserCheck size={16} /> Portal Dashboard
+          </button>
+          <button
+            onClick={() => setActivePortalTab('salary')}
+            className={`apc-btn ${activePortalTab === 'salary' ? 'apc-btn-primary' : 'apc-btn-secondary'}`}
+            style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '0.5rem 1rem' }}
+          >
+            <FileText size={16} /> My Salary Slips
+          </button>
+        </div>
+
+        {activePortalTab === 'dashboard' && (
+          <>
+            {/* MNC Leave Balances & C-Off Widget */}
+            <div className="apc-card" style={{ marginBottom: '1.5rem', background: 'var(--apc-surface)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                <h3 style={{ fontSize: '1.05rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Calendar size={18} color="var(--apc-primary-dark)" /> MNC Leave & C-Off Balances
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>Updated Real-Time</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                <div style={{ padding: '0.75rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-border)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>CASUAL LEAVE</span>
+                  <strong style={{ fontSize: '1.3rem', color: 'var(--apc-text-primary)' }}>{profileData?.casualLeaveBalance ?? user?.casualLeaveBalance ?? 12}</strong>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--apc-text-secondary)', display: 'block' }}>Days Remaining</span>
+                </div>
+
+                <div style={{ padding: '0.75rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-border)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>SICK LEAVE</span>
+                  <strong style={{ fontSize: '1.3rem', color: 'var(--apc-text-primary)' }}>{profileData?.sickLeaveBalance ?? user?.sickLeaveBalance ?? 12}</strong>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--apc-text-secondary)', display: 'block' }}>Days Remaining</span>
+                </div>
+
+                <div style={{ padding: '0.75rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-border)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>PAID LEAVE</span>
+                  <strong style={{ fontSize: '1.3rem', color: 'var(--apc-text-primary)' }}>{profileData?.paidLeaveBalance ?? user?.paidLeaveBalance ?? 15}</strong>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--apc-text-secondary)', display: 'block' }}>Days Remaining</span>
+                </div>
+
+                <div style={{ padding: '0.75rem', background: 'linear-gradient(135deg, rgba(46, 158, 91, 0.12) 0%, rgba(30, 120, 65, 0.04) 100%)', borderRadius: 'var(--apc-radius-sm)', border: '1px solid rgba(46, 158, 91, 0.3)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--apc-success)', display: 'block', fontWeight: 600 }}>C-OFF BALANCE</span>
+                  <strong style={{ fontSize: '1.3rem', color: 'var(--apc-success)' }}>{profileData?.coffBalance ?? user?.coffBalance ?? 0}</strong>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--apc-text-secondary)', display: 'block' }}>Holiday Earned</span>
+                </div>
+              </div>
+            </div>
 
         {/* Live Digital Clock Widget */}
         <div
@@ -441,6 +532,157 @@ export default function Home() {
             </div>
           </div>
         )}
+        </>
+        )}
+
+        {/* MY SALARY SLIPS TAB VIEW */}
+        {activePortalTab === 'salary' && (
+          <div className="apc-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', margin: 0 }}>My Monthly Salary Slips</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)', margin: '2px 0 0 0' }}>
+                  Calculated automatically based on your punches, overtime, and approved leaves.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <input
+                  type="month"
+                  className="apc-input"
+                  style={{ width: 'auto', padding: '0.35rem 0.65rem' }}
+                  value={salaryMonth}
+                  onChange={e => setSalaryMonth(e.target.value)}
+                />
+                <button onClick={() => window.print()} className="apc-btn apc-btn-secondary" style={{ padding: '0.4rem 0.85rem' }}>
+                  <FileText size={15} /> Print Payslip
+                </button>
+              </div>
+            </div>
+
+            {loadingSalary ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>Loading payslip breakdown...</div>
+            ) : salarySlip ? (
+              <div
+                style={{
+                  border: '2px solid var(--apc-border)',
+                  borderRadius: 'var(--apc-radius-md)',
+                  padding: '1.5rem',
+                  background: '#FFFFFF',
+                  color: '#1A1612'
+                }}
+              >
+                {/* MNC Payslip Header */}
+                <div style={{ borderBottom: '2px solid var(--apc-primary)', paddingBottom: '1rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h2 style={{ color: 'var(--apc-primary-dark)', fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>
+                      AP CORPORATION PRIVATE LIMITED
+                    </h2>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      EMPLOYEE SALARY SLIP — {salarySlip.month}
+                    </span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, background: 'var(--apc-primary-tint)', padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid var(--apc-primary)' }}>
+                      CONFIRMED PAYSLIP
+                    </span>
+                  </div>
+                </div>
+
+                {/* Employee Info Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                  <div><strong>Employee ID:</strong> <br/><span style={{ fontFamily: 'monospace' }}>{user?.id}</span></div>
+                  <div><strong>Employee Name:</strong> <br/>{user?.fullName || profileData?.fullName}</div>
+                  <div><strong>Department:</strong> <br/>{user?.department}</div>
+                  <div><strong>Designation:</strong> <br/>{user?.designation}</div>
+                </div>
+
+                {/* Attendance Summary Grid */}
+                <h4 style={{ fontSize: '0.95rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>
+                  ATTENDANCE & OVERTIME METRICS
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1.25rem', textAlign: 'center' }}>
+                  <div style={{ padding: '0.65rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>WORKING DAYS</span>
+                    <strong style={{ fontSize: '1.1rem' }}>{salarySlip.workingDays}</strong>
+                  </div>
+                  <div style={{ padding: '0.65rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>PRESENT DAYS</span>
+                    <strong style={{ fontSize: '1.1rem', color: 'var(--apc-success)' }}>{salarySlip.presentDays}</strong>
+                  </div>
+                  <div style={{ padding: '0.65rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>HALF DAYS</span>
+                    <strong style={{ fontSize: '1.1rem', color: 'var(--apc-warning)' }}>{salarySlip.halfDays}</strong>
+                  </div>
+                  <div style={{ padding: '0.65rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>PAID LEAVES</span>
+                    <strong style={{ fontSize: '1.1rem' }}>{salarySlip.paidLeaves}</strong>
+                  </div>
+                  <div style={{ padding: '0.65rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>OVERTIME HOURS</span>
+                    <strong style={{ fontSize: '1.1rem', color: 'var(--apc-primary-dark)' }}>{salarySlip.overtimeHours} hrs</strong>
+                  </div>
+                </div>
+
+                {/* Financial Table */}
+                <h4 style={{ fontSize: '0.95rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>
+                  FINANCIAL EARNINGS & DEDUCTIONS
+                </h4>
+                <div className="apc-table-container" style={{ marginBottom: '1.25rem' }}>
+                  <table className="apc-table" style={{ fontSize: '0.88rem' }}>
+                    <thead>
+                      <tr>
+                        <th>EARNINGS</th>
+                        <th style={{ textAlign: 'right' }}>AMOUNT (₹)</th>
+                        <th>DEDUCTIONS</th>
+                        <th style={{ textAlign: 'right' }}>AMOUNT (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Base Monthly Salary</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>₹{salarySlip.baseSalary.toLocaleString('en-IN')}</td>
+                        <td>Unpaid Absence ({salarySlip.unpaidAbsentDays} days)</td>
+                        <td style={{ textAlign: 'right', color: 'var(--apc-danger)', fontWeight: 600 }}>- ₹{salarySlip.unpaidDeductions.toLocaleString('en-IN')}</td>
+                      </tr>
+                      <tr>
+                        <td>Overtime Pay ({salarySlip.overtimeHours} hrs @ 1.5x)</td>
+                        <td style={{ textAlign: 'right', color: 'var(--apc-success)', fontWeight: 600 }}>+ ₹{salarySlip.overtimePay.toLocaleString('en-IN')}</td>
+                        <td>Taxes / Statutory</td>
+                        <td style={{ textAlign: 'right' }}>₹0.00</td>
+                      </tr>
+                      <tr style={{ background: 'var(--apc-bg)', fontWeight: 'bold' }}>
+                        <td>GROSS EARNINGS</td>
+                        <td style={{ textAlign: 'right', color: 'var(--apc-primary-dark)' }}>₹{salarySlip.grossSalary.toLocaleString('en-IN')}</td>
+                        <td>TOTAL DEDUCTIONS</td>
+                        <td style={{ textAlign: 'right', color: 'var(--apc-danger)' }}>- ₹{salarySlip.unpaidDeductions.toLocaleString('en-IN')}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Net Salary Footer */}
+                <div style={{ background: 'linear-gradient(135deg, rgba(245, 166, 35, 0.15) 0%, rgba(200, 120, 20, 0.05) 100%)', padding: '1rem 1.25rem', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      TOTAL NET SALARY DISBURSED
+                    </span>
+                    <p style={{ fontSize: '0.8rem', margin: '2px 0 0 0', color: 'var(--apc-text-secondary)' }}>
+                      Direct Bank Transfer / APC Payroll
+                    </p>
+                  </div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--apc-primary-dark)' }}>
+                    ₹{salarySlip.netSalary.toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--apc-text-secondary)' }}>
+                No payslip generated for {salaryMonth}.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* APPLY FOR LEAVE MODAL */}
         {showLeaveModal && (
@@ -457,9 +699,10 @@ export default function Home() {
                 <div className="apc-form-group">
                   <label>Leave Type</label>
                   <select className="apc-select" value={leaveType} onChange={e => setLeaveType(e.target.value)}>
-                    <option value="Paid Leave">Paid Leave</option>
-                    <option value="Casual Leave">Casual Leave</option>
-                    <option value="Sick Leave">Sick Leave</option>
+                    <option value="Casual Leave">Casual Leave (Balance: {profileData?.casualLeaveBalance ?? user?.casualLeaveBalance ?? 12})</option>
+                    <option value="Sick Leave">Sick Leave (Balance: {profileData?.sickLeaveBalance ?? user?.sickLeaveBalance ?? 12})</option>
+                    <option value="Paid Leave">Paid Leave (Balance: {profileData?.paidLeaveBalance ?? user?.paidLeaveBalance ?? 15})</option>
+                    <option value="Compensatory Off (C-Off)">Compensatory Off / C-Off (Balance: {profileData?.coffBalance ?? user?.coffBalance ?? 0})</option>
                   </select>
                 </div>
 

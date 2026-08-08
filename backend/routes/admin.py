@@ -203,7 +203,12 @@ def create_employee():
         profile_photo_url=photo_url,
         password_hash=generate_password_hash(password),
         must_change_password=data.get('mustChangePassword', True),
-        created_by=admin_name
+        created_by=admin_name,
+        base_salary=float(data.get('baseSalary', 0.0) or 0.0),
+        casual_leave_balance=float(data.get('casualLeaveBalance', 12.0) or 12.0),
+        sick_leave_balance=float(data.get('sickLeaveBalance', 12.0) or 12.0),
+        paid_leave_balance=float(data.get('paidLeaveBalance', 15.0) or 15.0),
+        coff_balance=float(data.get('coffBalance', 0.0) or 0.0)
     )
 
     try:
@@ -270,6 +275,11 @@ def update_employee(id):
     if 'department' in data: employee.department = data['department'].strip()
     if 'employmentType' in data: employee.employment_type = data['employmentType']
     if 'reportingManagerId' in data: employee.reporting_manager_id = data['reportingManagerId']
+    if 'baseSalary' in data: employee.base_salary = float(data['baseSalary'] or 0.0)
+    if 'casualLeaveBalance' in data: employee.casual_leave_balance = float(data['casualLeaveBalance'] or 0.0)
+    if 'sickLeaveBalance' in data: employee.sick_leave_balance = float(data['sickLeaveBalance'] or 0.0)
+    if 'paidLeaveBalance' in data: employee.paid_leave_balance = float(data['paidLeaveBalance'] or 0.0)
+    if 'coffBalance' in data: employee.coff_balance = float(data['coffBalance'] or 0.0)
     
     photo_payload = data.get('profilePhoto') or data.get('photo')
     if photo_payload:
@@ -446,13 +456,26 @@ def admin_review_leave_request(req_id):
     leave_req.manager_comment = comment
     leave_req.reviewed_at = datetime.utcnow()
 
-    # If approved, update attendance records to on_leave for that date range
+    # If approved, update attendance records to on_leave for that date range and deduct leave balance
     if action == 'approve':
         try:
             start_dt = datetime.strptime(leave_req.start_date, '%Y-%m-%d')
             end_dt = datetime.strptime(leave_req.end_date, '%Y-%m-%d')
-            curr_dt = start_dt
+            num_days = (end_dt - start_dt).days + 1
 
+            target_emp = Employee.query.get(leave_req.employee_id)
+            if target_emp:
+                l_type = leave_req.leave_type
+                if l_type == 'Casual Leave':
+                    target_emp.casual_leave_balance = max(0.0, (getattr(target_emp, 'casual_leave_balance', 12.0) or 12.0) - num_days)
+                elif l_type == 'Sick Leave':
+                    target_emp.sick_leave_balance = max(0.0, (getattr(target_emp, 'sick_leave_balance', 12.0) or 12.0) - num_days)
+                elif l_type == 'Paid Leave':
+                    target_emp.paid_leave_balance = max(0.0, (getattr(target_emp, 'paid_leave_balance', 15.0) or 15.0) - num_days)
+                elif l_type in ['Compensatory Off (C-Off)', 'C-Off']:
+                    target_emp.coff_balance = max(0.0, (getattr(target_emp, 'coff_balance', 0.0) or 0.0) - num_days)
+
+            curr_dt = start_dt
             while curr_dt <= end_dt:
                 d_str = curr_dt.strftime('%Y-%m-%d')
                 rec = AttendanceRecord.query.filter_by(employee_id=leave_req.employee_id, date=d_str).first()
@@ -484,6 +507,26 @@ def admin_review_leave_request(req_id):
         'message': f'Leave request successfully {leave_req.status} by Super Admin.',
         'leaveRequest': leave_req.to_dict()
     }), 200
+
+
+@admin_bp.route('/employees/<id>/salary-slip', methods=['GET'])
+def get_employee_salary_slip_admin(id):
+    employee = Employee.query.get(id)
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+
+    month_str = request.args.get('month')
+    if not month_str:
+        month_str = datetime.utcnow().strftime('%Y-%m')
+
+    from utils import calculate_monthly_salary_slip
+    salary_slip_data = calculate_monthly_salary_slip(employee, month_str)
+
+    return jsonify({
+        'employee': employee.to_dict(),
+        'salarySlip': salary_slip_data
+    }), 200
+
 
 
 

@@ -25,6 +25,13 @@ class Employee(db.Model):
     created_by = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Salary & Leave Balances
+    base_salary = db.Column(db.Float, default=0.0)
+    casual_leave_balance = db.Column(db.Float, default=12.0)
+    sick_leave_balance = db.Column(db.Float, default=12.0)
+    paid_leave_balance = db.Column(db.Float, default=15.0)
+    coff_balance = db.Column(db.Float, default=0.0)
+
     # Relationships
     reporting_manager = db.relationship('Employee', remote_side=[id], backref='direct_reports')
     documents = db.relationship('Document', backref='employee', lazy=True, cascade='all, delete-orphan')
@@ -53,7 +60,12 @@ class Employee(db.Model):
             'profilePhotoUrl': self.profile_photo_url,
             'mustChangePassword': self.must_change_password,
             'createdBy': self.created_by,
-            'createdAt': self.created_at.isoformat() if self.created_at else None
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'baseSalary': getattr(self, 'base_salary', 0.0) or 0.0,
+            'casualLeaveBalance': getattr(self, 'casual_leave_balance', 12.0) if getattr(self, 'casual_leave_balance', None) is not None else 12.0,
+            'sickLeaveBalance': getattr(self, 'sick_leave_balance', 12.0) if getattr(self, 'sick_leave_balance', None) is not None else 12.0,
+            'paidLeaveBalance': getattr(self, 'paid_leave_balance', 15.0) if getattr(self, 'paid_leave_balance', None) is not None else 15.0,
+            'coffBalance': getattr(self, 'coff_balance', 0.0) or 0.0
         }
         return data
 
@@ -231,4 +243,54 @@ class LeaveRequest(db.Model):
             'reviewedAt': self.reviewed_at.isoformat() if self.reviewed_at else None,
             'createdAt': self.created_at.isoformat() if self.created_at else None
         }
+
+
+class SalarySlip(db.Model):
+    __tablename__ = 'salary_slips'
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.String(20), db.ForeignKey('employees.id'), nullable=False)
+    month = db.Column(db.String(7), nullable=False)  # YYYY-MM
+    base_salary = db.Column(db.Float, nullable=False, default=0.0)
+    working_days = db.Column(db.Integer, nullable=False, default=0)
+    present_days = db.Column(db.Float, nullable=False, default=0.0)
+    half_days = db.Column(db.Integer, nullable=False, default=0)
+    absent_days = db.Column(db.Integer, nullable=False, default=0)
+    paid_leaves = db.Column(db.Float, nullable=False, default=0.0)
+    overtime_hours = db.Column(db.Float, nullable=False, default=0.0)
+    overtime_pay = db.Column(db.Float, nullable=False, default=0.0)
+    unpaid_deductions = db.Column(db.Float, nullable=False, default=0.0)
+    gross_salary = db.Column(db.Float, nullable=False, default=0.0)
+    net_salary = db.Column(db.Float, nullable=False, default=0.0)
+    status = db.Column(db.String(20), nullable=False, default='generated')  # 'generated', 'paid'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    employee = db.relationship('Employee', backref='salary_slips', lazy=True)
+
+    def __init__(self, **kwargs):
+        super(SalarySlip, self).__init__(**kwargs)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'employeeId': self.employee_id,
+            'employeeName': f"{self.employee.first_name} {self.employee.last_name}" if self.employee else self.employee_id,
+            'department': self.employee.department if self.employee else None,
+            'designation': self.employee.designation if self.employee else None,
+            'month': self.month,
+            'baseSalary': self.base_salary,
+            'workingDays': self.working_days,
+            'presentDays': self.present_days,
+            'halfDays': self.half_days,
+            'absentDays': self.absent_days,
+            'paidLeaves': self.paid_leaves,
+            'overtimeHours': round(self.overtime_hours, 2),
+            'overtimePay': round(self.overtime_pay, 2),
+            'unpaidDeductions': round(self.unpaid_deductions, 2),
+            'grossSalary': round(self.gross_salary, 2),
+            'netSalary': round(self.net_salary, 2),
+            'status': self.status,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
+
 

@@ -21,6 +21,10 @@ export default function CreateEmployee() {
   const [department, setDepartment] = useState('Creative');
   const [employmentType, setEmploymentType] = useState('Full-time');
   const [reportingManagerId, setReportingManagerId] = useState('');
+  const [baseSalary, setBaseSalary] = useState('50000');
+  const [casualLeaveBalance, setCasualLeaveBalance] = useState('12');
+  const [sickLeaveBalance, setSickLeaveBalance] = useState('12');
+  const [paidLeaveBalance, setPaidLeaveBalance] = useState('15');
   const [profilePhoto, setProfilePhoto] = useState(null);
 
   // Optional Accordion state
@@ -180,6 +184,10 @@ export default function CreateEmployee() {
           department,
           employmentType,
           reportingManagerId: reportingManagerId || null,
+          baseSalary: parseFloat(baseSalary || 0),
+          casualLeaveBalance: parseFloat(casualLeaveBalance || 12),
+          sickLeaveBalance: parseFloat(sickLeaveBalance || 12),
+          paidLeaveBalance: parseFloat(paidLeaveBalance || 15),
           password,
           mustChangePassword,
           profilePhoto
@@ -366,6 +374,56 @@ export default function CreateEmployee() {
                       <option key={m.id} value={m.id}>{m.fullName} ({m.designation || 'Manager'})</option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Salary & Annual Leave Quotas */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem', marginTop: '0.5rem', background: 'var(--apc-surface)', padding: '0.85rem', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-border)' }}>
+                <div className="apc-form-group" style={{ margin: 0 }}>
+                  <label htmlFor="baseSalary">Base Salary (INR/Mo) <span className="required">*</span></label>
+                  <input
+                    id="baseSalary"
+                    type="number"
+                    min="0"
+                    className="apc-input"
+                    placeholder="e.g. 50000"
+                    value={baseSalary}
+                    onChange={e => setBaseSalary(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="apc-form-group" style={{ margin: 0 }}>
+                  <label htmlFor="casualLeave">Casual Leaves</label>
+                  <input
+                    id="casualLeave"
+                    type="number"
+                    min="0"
+                    className="apc-input"
+                    value={casualLeaveBalance}
+                    onChange={e => setCasualLeaveBalance(e.target.value)}
+                  />
+                </div>
+                <div className="apc-form-group" style={{ margin: 0 }}>
+                  <label htmlFor="sickLeave">Sick Leaves</label>
+                  <input
+                    id="sickLeave"
+                    type="number"
+                    min="0"
+                    className="apc-input"
+                    value={sickLeaveBalance}
+                    onChange={e => setSickLeaveBalance(e.target.value)}
+                  />
+                </div>
+                <div className="apc-form-group" style={{ margin: 0 }}>
+                  <label htmlFor="paidLeave">Paid Leaves</label>
+                  <input
+                    id="paidLeave"
+                    type="number"
+                    min="0"
+                    className="apc-input"
+                    value={paidLeaveBalance}
+                    onChange={e => setPaidLeaveBalance(e.target.value)}
+                  />
                 </div>
               </div>
 

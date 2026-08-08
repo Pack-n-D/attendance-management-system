@@ -149,10 +149,22 @@ def punch_out():
 
     record.punch_out_time = now_time_str
     record.punch_out_photo_url = photo_url
+
+    # Check if working on a holiday or weekly off to credit C-Off
+    from utils import is_holiday_or_weekly_off
+    is_off, reason = is_holiday_or_weekly_off(today_str)
+    coff_msg = ""
+    if is_off:
+        employee = Employee.query.get(user_id)
+        if employee:
+            employee.coff_balance = (getattr(employee, 'coff_balance', 0.0) or 0.0) + 1.0
+            log_audit(user_id, f"{employee.first_name} {employee.last_name}", f"Auto-Credited 1.0 C-Off Day for working on {reason} on {today_str}", "Employee", user_id)
+            coff_msg = f" 🎉 1.0 C-Off Day earned for working on {reason}!"
+
     db.session.commit()
 
     return jsonify({
-        'message': f"Punched out successfully at {now_time_str}",
+        'message': f"Punched out successfully at {now_time_str}.{coff_msg}",
         'recordedTime': now_time_str,
         'record': record.to_dict()
     }), 200

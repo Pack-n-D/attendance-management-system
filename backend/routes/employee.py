@@ -223,13 +223,26 @@ def review_leave_request(req_id):
     leave_req.manager_comment = comment
     leave_req.reviewed_at = datetime.utcnow()
 
-    # If approved, update attendance records to on_leave for that date range
+    # If approved, update attendance records to on_leave for that date range and deduct leave balance
     if action == 'approve':
         try:
             start_dt = datetime.strptime(leave_req.start_date, '%Y-%m-%d')
             end_dt = datetime.strptime(leave_req.end_date, '%Y-%m-%d')
-            curr_dt = start_dt
+            num_days = (end_dt - start_dt).days + 1
 
+            target_emp = Employee.query.get(leave_req.employee_id)
+            if target_emp:
+                l_type = leave_req.leave_type
+                if l_type == 'Casual Leave':
+                    target_emp.casual_leave_balance = max(0.0, (getattr(target_emp, 'casual_leave_balance', 12.0) or 12.0) - num_days)
+                elif l_type == 'Sick Leave':
+                    target_emp.sick_leave_balance = max(0.0, (getattr(target_emp, 'sick_leave_balance', 12.0) or 12.0) - num_days)
+                elif l_type == 'Paid Leave':
+                    target_emp.paid_leave_balance = max(0.0, (getattr(target_emp, 'paid_leave_balance', 15.0) or 15.0) - num_days)
+                elif l_type in ['Compensatory Off (C-Off)', 'C-Off']:
+                    target_emp.coff_balance = max(0.0, (getattr(target_emp, 'coff_balance', 0.0) or 0.0) - num_days)
+
+            curr_dt = start_dt
             while curr_dt <= end_dt:
                 d_str = curr_dt.strftime('%Y-%m-%d')
                 rec = AttendanceRecord.query.filter_by(employee_id=leave_req.employee_id, date=d_str).first()
@@ -261,4 +274,26 @@ def review_leave_request(req_id):
         'message': f'Leave request successfully {leave_req.status}.',
         'leaveRequest': leave_req.to_dict()
     }), 200
+
+
+@employee_bp.route('/salary-slips', methods=['GET'])
+@jwt_required()
+def get_my_salary_slips():
+    user_id = get_jwt_identity()
+    employee = Employee.query.get(user_id)
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+
+    month_str = request.args.get('month')
+    if not month_str:
+        month_str = datetime.utcnow().strftime('%Y-%m')
+
+    from utils import calculate_monthly_salary_slip
+    salary_slip_data = calculate_monthly_salary_slip(employee, month_str)
+
+    return jsonify({
+        'employee': employee.to_dict(),
+        'salarySlip': salary_slip_data
+    }), 200
+
 
