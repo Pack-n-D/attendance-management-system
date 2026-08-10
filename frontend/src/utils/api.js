@@ -34,6 +34,9 @@ export async function apiFetch(endpoint, options = {}) {
   let data = {};
   const text = await response.text();
   if (text.trim().startsWith('<') || text.trim().toLowerCase().startsWith('<!doctype')) {
+    if (!response.ok) {
+      throw new Error(`Server error (${response.status}). Backend is applying database updates — please retry in 10 seconds.`);
+    }
     throw new Error('Backend API URL misconfigured. Received HTML page instead of JSON API response.');
   }
 

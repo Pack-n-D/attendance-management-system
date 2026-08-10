@@ -44,23 +44,46 @@ def create_app():
         try:
             db.create_all()
 
-            # Automatic non-destructive schema migration for profile_photo_url column to TEXT and new columns
+            # Automatic non-destructive schema migration for columns across PostgreSQL & SQLite
             try:
                 db.session.execute(db.text("ALTER TABLE employees ALTER COLUMN profile_photo_url TYPE TEXT;"))
                 db.session.commit()
-            except Exception as alter_err:
+            except Exception:
                 db.session.rollback()
 
-            new_cols = [
+            emp_cols = [
                 ("base_salary", "FLOAT DEFAULT 0.0"),
                 ("casual_leave_balance", "FLOAT DEFAULT 12.0"),
                 ("sick_leave_balance", "FLOAT DEFAULT 12.0"),
                 ("paid_leave_balance", "FLOAT DEFAULT 15.0"),
                 ("coff_balance", "FLOAT DEFAULT 0.0")
             ]
-            for col_name, col_type in new_cols:
+            for col_name, col_type in emp_cols:
                 try:
                     db.session.execute(db.text(f"ALTER TABLE employees ADD COLUMN {col_name} {col_type};"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+            leave_cols = [
+                ("withdraw_reason", "TEXT"),
+                ("manager_comment", "TEXT"),
+                ("reporting_manager_id", "VARCHAR(20)")
+            ]
+            for col_name, col_type in leave_cols:
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE leave_requests ADD COLUMN {col_name} {col_type};"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+            doc_cols = [
+                ("uploaded_by", "VARCHAR(100)"),
+                ("uploaded_at", "TIMESTAMP")
+            ]
+            for col_name, col_type in doc_cols:
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE documents ADD COLUMN {col_name} {col_type};"))
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
