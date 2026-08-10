@@ -590,7 +590,7 @@ export default function Home() {
                 </div>
 
                 {/* Employee Info Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                <div className="apc-payslip-meta-grid" style={{ padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
                   <div><strong>Employee ID:</strong> <br/><span style={{ fontFamily: 'monospace' }}>{user?.id}</span></div>
                   <div><strong>Employee Name:</strong> <br/>{user?.fullName || profileData?.fullName}</div>
                   <div><strong>Department:</strong> <br/>{user?.department}</div>
@@ -601,7 +601,7 @@ export default function Home() {
                 <h4 style={{ fontSize: '0.95rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>
                   ATTENDANCE & OVERTIME METRICS
                 </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1.25rem', textAlign: 'center' }}>
+                <div className="apc-payslip-metrics-grid" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
                   <div style={{ padding: '0.65rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>WORKING DAYS</span>
                     <strong style={{ fontSize: '1.1rem' }}>{salarySlip.workingDays}</strong>
@@ -626,15 +626,15 @@ export default function Home() {
 
                 {/* Financial Table */}
                 <h4 style={{ fontSize: '0.95rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>
-                  FINANCIAL EARNINGS & DEDUCTIONS
+                  FINANCIAL BREAKDOWN (INR)
                 </h4>
                 <div className="apc-table-container" style={{ marginBottom: '1.25rem' }}>
                   <table className="apc-table" style={{ fontSize: '0.88rem' }}>
                     <thead>
                       <tr>
-                        <th>EARNINGS</th>
+                        <th>EARNINGS ITEM</th>
                         <th style={{ textAlign: 'right' }}>AMOUNT (₹)</th>
-                        <th>DEDUCTIONS</th>
+                        <th>DEDUCTIONS ITEM</th>
                         <th style={{ textAlign: 'right' }}>AMOUNT (₹)</th>
                       </tr>
                     </thead>
@@ -661,14 +661,14 @@ export default function Home() {
                   </table>
                 </div>
 
-                {/* Net Salary Footer */}
+                {/* Net Salary Highlight Footer */}
                 <div style={{ background: 'linear-gradient(135deg, rgba(245, 166, 35, 0.15) 0%, rgba(200, 120, 20, 0.05) 100%)', padding: '1rem 1.25rem', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                      TOTAL NET SALARY DISBURSED
+                      TOTAL NET PAYABLE SALARY
                     </span>
                     <p style={{ fontSize: '0.8rem', margin: '2px 0 0 0', color: 'var(--apc-text-secondary)' }}>
-                      Direct Bank Transfer / APC Payroll
+                      Direct Bank Transfer / Auto-Disbursed
                     </p>
                   </div>
                   <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--apc-primary-dark)' }}>
@@ -678,13 +678,13 @@ export default function Home() {
               </div>
             ) : (
               <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--apc-text-secondary)' }}>
-                No payslip generated for {salaryMonth}.
+                No salary slip calculated for this month.
               </div>
             )}
           </div>
         )}
 
-        {/* APPLY FOR LEAVE MODAL */}
+        {/* Apply Leave Modal */}
         {showLeaveModal && (
           <div className="apc-modal-overlay">
             <div className="apc-modal" style={{ maxWidth: '460px' }}>
@@ -706,7 +706,7 @@ export default function Home() {
                   </select>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="apc-grid-2col" style={{ gap: '0.75rem' }}>
                   <div className="apc-form-group">
                     <label>Start Date</label>
                     <input

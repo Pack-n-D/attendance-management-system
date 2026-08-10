@@ -193,7 +193,7 @@ export default function AttendanceSettings() {
                 Shift Timings & Grace Buffers
               </h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div className="apc-grid-2col" style={{ gap: '1.25rem' }}>
                 <div className="apc-form-group">
                   <label htmlFor="idealIn">Ideal Punch-In Time</label>
                   <input

@@ -54,7 +54,7 @@ export default function WelcomeCardModal({ data, onClose }) {
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             
             {/* Left Section: Details */}
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="apc-grid-2col" style={{ flex: 1 }}>
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block' }}>EMPLOYEE NAME</span>
                 <strong style={{ fontSize: '1.15rem', color: 'var(--apc-text-primary)' }}>{data.fullName}</strong>

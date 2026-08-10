@@ -68,7 +68,7 @@ export default function Navbar() {
             title="Sign out"
           >
             <LogOut size={16} />
-            <span style={{ display: window.innerWidth > 600 ? 'inline' : 'none' }}>Logout</span>
+            <span className="apc-logout-text">Logout</span>
           </button>
         </div>
       )}

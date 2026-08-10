@@ -433,18 +433,143 @@ a:hover {
 }
 
 /* Mobile responsive adjustments */
+.apc-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.apc-grid-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.apc-grid-4col {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+.apc-payslip-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.apc-payslip-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+}
+
+/* Tablet & Mobile (<= 768px) */
 @media (max-width: 768px) {
+  .apc-header {
+    padding: 0.5rem 1rem;
+  }
+
   .apc-layout-container {
     flex-direction: column;
   }
+
   .apc-sidebar {
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--apc-border);
     flex-direction: row;
     overflow-x: auto;
+    white-space: nowrap;
+    padding: 0.5rem 0.75rem;
+    -webkit-overflow-scrolling: touch;
   }
+
+  .apc-sidebar::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .apc-sidebar::-webkit-scrollbar-thumb {
+    background: var(--apc-border);
+    border-radius: 4px;
+  }
+
+  .apc-nav-item {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+  }
+
   .apc-main-content {
     padding: 1rem;
+  }
+
+  .apc-grid-2col,
+  .apc-grid-3col {
+    grid-template-columns: 1fr;
+  }
+
+  .apc-grid-4col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .apc-payslip-meta-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .apc-payslip-metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .apc-table th, .apc-table td {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .apc-table-container {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Small Mobile (<= 520px) */
+@media (max-width: 520px) {
+  body {
+    font-size: 14px;
+  }
+
+  .apc-logout-text {
+    display: none;
+  }
+
+  .apc-grid-4col {
+    grid-template-columns: 1fr;
+  }
+
+  .apc-payslip-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .apc-payslip-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .apc-card {
+    padding: 1rem;
+  }
+
+  .apc-btn {
+    padding: 0.55rem 0.85rem;
+    font-size: 0.85rem;
+  }
+
+  .apc-modal {
+    padding: 1.1rem;
+    margin: 0.5rem;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .apc-steps {
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 }

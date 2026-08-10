@@ -246,7 +246,7 @@ export default function CreateEmployee() {
           {step === 1 ? (
             /* STEP 1: DETAILS */
             <form onSubmit={e => { e.preventDefault(); setStep(2); }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="apc-grid-2col">
                 <div className="apc-form-group">
                   <label htmlFor="firstName">First Name <span className="required">*</span></label>
                   <input
@@ -274,7 +274,7 @@ export default function CreateEmployee() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="apc-grid-2col">
                 <div className="apc-form-group">
                   <label htmlFor="email">Email Address <span className="required">*</span></label>
                   <input
@@ -304,7 +304,7 @@ export default function CreateEmployee() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="apc-grid-2col">
                 <div className="apc-form-group">
                   <label htmlFor="dob">Date of Birth <span className="required">*</span></label>
                   <input
@@ -330,7 +330,7 @@ export default function CreateEmployee() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="apc-grid-2col">
                 <div className="apc-form-group">
                   <label htmlFor="department">Department <span className="required">*</span></label>
                   <select id="department" className="apc-select" value={department} onChange={e => setDepartment(e.target.value)}>
@@ -354,7 +354,7 @@ export default function CreateEmployee() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="apc-grid-2col">
                 <div className="apc-form-group">
                   <label htmlFor="employmentType">Employment Type</label>
                   <select id="employmentType" className="apc-select" value={employmentType} onChange={e => setEmploymentType(e.target.value)}>
@@ -378,7 +378,7 @@ export default function CreateEmployee() {
               </div>
 
               {/* Salary & Annual Leave Quotas */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem', marginTop: '0.5rem', background: 'var(--apc-surface)', padding: '0.85rem', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-border)' }}>
+              <div className="apc-grid-4col" style={{ marginTop: '0.5rem', background: 'var(--apc-surface)', padding: '0.85rem', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-border)' }}>
                 <div className="apc-form-group" style={{ margin: 0 }}>
                   <label htmlFor="baseSalary">Base Salary (INR/Mo) <span className="required">*</span></label>
                   <input

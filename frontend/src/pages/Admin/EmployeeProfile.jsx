@@ -274,6 +274,15 @@ export default function EmployeeProfile() {
               </div>
 
               <div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', display: 'block' }}>DATE OF BIRTH</span>
+                {editingOverview ? (
+                  <input type="date" className="apc-input" value={form.dob || ''} onChange={e => setForm({ ...form, dob: e.target.value })} />
+                ) : (
+                  <strong>{emp?.dob || '—'}</strong>
+                )}
+              </div>
+
+              <div>
                 <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', display: 'block' }}>DESIGNATION</span>
                 {editingOverview ? (
                   <input className="apc-input" value={form.designation || ''} onChange={e => setForm({ ...form, designation: e.target.value })} />
@@ -398,7 +407,7 @@ export default function EmployeeProfile() {
                 </div>
 
                 {/* Employee Meta Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                <div className="apc-payslip-meta-grid" style={{ padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
                   <div><strong>Employee ID:</strong> <br/><span style={{ fontFamily: 'monospace' }}>{emp?.id}</span></div>
                   <div><strong>Employee Name:</strong> <br/>{emp?.fullName}</div>
                   <div><strong>Department:</strong> <br/>{emp?.department}</div>
@@ -409,7 +418,7 @@ export default function EmployeeProfile() {
                 <h4 style={{ fontSize: '0.95rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.5px' }}>
                   ATTENDANCE & SHIFT METRICS
                 </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1.25rem', textAlign: 'center' }}>
+                <div className="apc-payslip-metrics-grid" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
                   <div style={{ padding: '0.65rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>WORKING DAYS</span>
                     <strong style={{ fontSize: '1.1rem' }}>{salarySlip.workingDays}</strong>

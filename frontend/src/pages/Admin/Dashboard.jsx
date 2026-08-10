@@ -175,7 +175,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div className="apc-grid-2col" style={{ gap: '1.5rem' }}>
             {/* Late Arrivals Today List */}
             <div className="apc-card">
               <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
