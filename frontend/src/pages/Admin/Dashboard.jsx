@@ -133,44 +133,82 @@ export default function Dashboard() {
               </h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-                {pendingLeavesList.map(req => (
-                  <div key={req.id} style={{ padding: '0.85rem', background: 'var(--apc-bg)', border: '1px solid var(--apc-border)', borderRadius: 'var(--apc-radius-sm)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <strong>{req.employeeName}</strong>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', marginLeft: '6px' }}>({req.department})</span>
-                        <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', color: 'var(--apc-primary-dark)', fontWeight: 600 }}>
-                          {req.leaveType}: {req.startDate} to {req.endDate}
+                {pendingLeavesList.map(req => {
+                  const isWithdrawal = req.status === 'withdrawal_requested';
+                  return (
+                    <div key={req.id} style={{ padding: '0.85rem', background: 'var(--apc-bg)', border: `1px solid ${isWithdrawal ? 'var(--apc-warning)' : 'var(--apc-border)'}`, borderRadius: 'var(--apc-radius-sm)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <strong>{req.employeeName}</strong>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>({req.department})</span>
+                            {isWithdrawal && (
+                              <span style={{ fontSize: '0.72rem', background: 'var(--apc-warning-bg)', color: 'var(--apc-warning)', border: '1px solid rgba(226, 163, 59, 0.4)', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                WITHDRAWAL REQUEST
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', color: 'var(--apc-primary-dark)', fontWeight: 600 }}>
+                            {req.leaveType}: {req.startDate} to {req.endDate}
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', marginTop: '0.2rem', margin: '2px 0' }}>
+                            <strong>Reason:</strong> {req.reason}
+                          </p>
+                          {isWithdrawal && req.withdrawReason && (
+                            <p style={{ fontSize: '0.8rem', color: 'var(--apc-danger)', margin: '2px 0' }}>
+                              <strong>Withdrawal Note:</strong> {req.withdrawReason}
+                            </p>
+                          )}
+                          <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block', marginTop: '2px' }}>
+                            Manager: {req.reportingManagerName || 'Super Admin'}
+                          </span>
                         </div>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', marginTop: '0.2rem' }}>
-                          <strong>Reason:</strong> {req.reason}
-                        </p>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)' }}>
-                          Manager: {req.reportingManagerName || 'Super Admin'}
-                        </span>
-                      </div>
 
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
-                        <button
-                          onClick={() => handleAdminReviewLeave(req.id, 'approve')}
-                          className="apc-btn apc-btn-primary"
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
-                          disabled={reviewingId === req.id}
-                        >
-                          <Check size={14} /> Approve
-                        </button>
-                        <button
-                          onClick={() => handleAdminReviewLeave(req.id, 'reject')}
-                          className="apc-btn apc-btn-danger"
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
-                          disabled={reviewingId === req.id}
-                        >
-                          <X size={14} /> Reject
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          {isWithdrawal ? (
+                            <>
+                              <button
+                                onClick={() => handleAdminReviewLeave(req.id, 'approve_withdrawal')}
+                                className="apc-btn apc-btn-primary"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                                disabled={reviewingId === req.id}
+                              >
+                                <Check size={14} /> Approve Withdrawal
+                              </button>
+                              <button
+                                onClick={() => handleAdminReviewLeave(req.id, 'reject_withdrawal')}
+                                className="apc-btn apc-btn-danger"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                                disabled={reviewingId === req.id}
+                              >
+                                <X size={14} /> Reject Withdrawal
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleAdminReviewLeave(req.id, 'approve')}
+                                className="apc-btn apc-btn-primary"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                                disabled={reviewingId === req.id}
+                              >
+                                <Check size={14} /> Approve
+                              </button>
+                              <button
+                                onClick={() => handleAdminReviewLeave(req.id, 'reject')}
+                                className="apc-btn apc-btn-danger"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                                disabled={reviewingId === req.id}
+                              >
+                                <X size={14} /> Reject
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

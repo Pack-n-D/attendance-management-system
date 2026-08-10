@@ -213,9 +213,10 @@ class LeaveRequest(db.Model):
     end_date = db.Column(db.String(10), nullable=False)    # YYYY-MM-DD
     leave_type = db.Column(db.String(50), nullable=False, default='Paid Leave')  # 'Casual Leave', 'Sick Leave', 'Paid Leave'
     reason = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), nullable=False, default='pending')  # 'pending', 'approved', 'rejected'
+    status = db.Column(db.String(30), nullable=False, default='pending')  # 'pending', 'approved', 'rejected', 'withdrawal_requested', 'withdrawn'
     reporting_manager_id = db.Column(db.String(20), db.ForeignKey('employees.id'), nullable=True)
     manager_comment = db.Column(db.Text, nullable=True)
+    withdraw_reason = db.Column(db.Text, nullable=True)
     reviewed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -240,6 +241,7 @@ class LeaveRequest(db.Model):
             'reportingManagerId': self.reporting_manager_id,
             'reportingManagerName': f"{self.reporting_manager.first_name} {self.reporting_manager.last_name}" if self.reporting_manager else None,
             'managerComment': self.manager_comment,
+            'withdrawReason': getattr(self, 'withdraw_reason', None),
             'reviewedAt': self.reviewed_at.isoformat() if self.reviewed_at else None,
             'createdAt': self.created_at.isoformat() if self.created_at else None
         }

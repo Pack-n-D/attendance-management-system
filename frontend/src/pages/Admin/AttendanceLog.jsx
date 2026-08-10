@@ -258,12 +258,29 @@ export default function AttendanceLog() {
                           <td style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)' }}>{r.reason}</td>
                           <td>{r.reportingManagerName || 'Super Admin'}</td>
                           <td>
-                            <span className={`apc-badge apc-badge-${r.status === 'approved' ? 'on_time' : r.status === 'rejected' ? 'late' : 'in_buffer'}`} style={{ textTransform: 'capitalize' }}>
-                              {r.status}
-                            </span>
+                            <StatusBadge status={r.status} />
                           </td>
                           <td>
-                            {r.status === 'pending' ? (
+                            {r.status === 'withdrawal_requested' ? (
+                              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                <button
+                                  onClick={() => handleAdminReviewLeave(r.id, 'approve_withdrawal')}
+                                  className="apc-btn apc-btn-primary"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  disabled={reviewingId === r.id}
+                                >
+                                  <Check size={12} /> Approve Withdrawal
+                                </button>
+                                <button
+                                  onClick={() => handleAdminReviewLeave(r.id, 'reject_withdrawal')}
+                                  className="apc-btn apc-btn-danger"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  disabled={reviewingId === r.id}
+                                >
+                                  <X size={12} /> Reject Withdrawal
+                                </button>
+                              </div>
+                            ) : r.status === 'pending' ? (
                               <div style={{ display: 'flex', gap: '0.35rem' }}>
                                 <button
                                   onClick={() => handleAdminReviewLeave(r.id, 'approve')}

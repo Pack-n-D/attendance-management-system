@@ -80,8 +80,8 @@ def get_dashboard_stats():
                 
     trend_chart = list(trend_by_date.values())
     
-    # Pending org-wide leave requests
-    pending_leaves = LeaveRequest.query.filter_by(status='pending').order_by(LeaveRequest.created_at.desc()).all()
+    # Pending org-wide leave requests (including withdrawal requests)
+    pending_leaves = LeaveRequest.query.filter(LeaveRequest.status.in_(['pending', 'withdrawal_requested'])).order_by(LeaveRequest.created_at.desc()).all()
 
     return jsonify({
         'todayDate': today_str,
@@ -332,6 +332,85 @@ def update_employee_photo_admin(id):
         return jsonify({'error': f'Failed to update photo: {str(e)}'}), 500
 
 
+@admin_bp.route('/employees/<id>/documents', methods=['POST', 'PUT'])
+def upload_employee_document_admin(id):
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    employee = Employee.query.get(id)
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+
+    data = request.get_json() or {}
+    doc_type = data.get('docType') or data.get('type')
+    file_name = data.get('fileName') or 'document'
+    file_data = data.get('fileData') or data.get('fileUrl')
+
+    if not doc_type or not file_data:
+        return jsonify({'error': 'docType and fileData are required'}), 400
+
+    try:
+        file_url = file_data
+        if file_data.startswith('data:'):
+            file_url = save_base64_photo(file_data, folder_name=f"doc_{id}_{doc_type}", return_data_uri=True)
+
+        existing_doc = Document.query.filter_by(employee_id=id, type=doc_type).first()
+        if existing_doc:
+            existing_doc.file_url = file_url
+            existing_doc.file_name = file_name
+            existing_doc.uploaded_by = admin_name
+            existing_doc.uploaded_at = datetime.utcnow()
+            doc_record = existing_doc
+        else:
+            doc_record = Document(
+                employee_id=id,
+                type=doc_type,
+                file_url=file_url,
+                file_name=file_name,
+                uploaded_by=admin_name,
+                uploaded_at=datetime.utcnow()
+            )
+            db.session.add(doc_record)
+
+        db.session.commit()
+        log_audit(admin_id, admin_name, f"Uploaded {doc_type.upper()} document for Employee {employee.id}", "Document", str(doc_record.id))
+
+        docs = [d.to_dict() for d in employee.documents]
+        return jsonify({
+            'message': f'Document {doc_type.upper()} uploaded successfully',
+            'documents': docs,
+            'document': doc_record.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to upload document: {str(e)}'}), 500
+
+
+@admin_bp.route('/employees/<id>/documents/<int:doc_id>', methods=['DELETE'])
+def delete_employee_document_admin(id, doc_id):
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    doc = Document.query.filter_by(id=doc_id, employee_id=id).first()
+    if not doc:
+        return jsonify({'error': 'Document record not found'}), 404
+
+    doc_type = doc.type
+    db.session.delete(doc)
+    db.session.commit()
+
+    log_audit(admin_id, admin_name, f"Deleted {doc_type.upper()} document for Employee {id}", "Document", str(doc_id))
+
+    employee = Employee.query.get(id)
+    docs = [d.to_dict() for d in employee.documents] if employee else []
+    return jsonify({
+        'message': f'Document {doc_type.upper()} deleted successfully',
+        'documents': docs
+    }), 200
+
+
 
 @admin_bp.route('/employees/<id>/reset-password', methods=['POST'])
 def reset_employee_password(id):
@@ -446,24 +525,64 @@ def admin_review_leave_request(req_id):
         return jsonify({'error': 'Leave request not found'}), 404
 
     data = request.get_json() or {}
-    action = data.get('action')  # 'approve' or 'reject'
+    action = data.get('action')  # 'approve', 'reject', 'approve_withdrawal', 'reject_withdrawal'
     comment = data.get('comment', '')
 
-    if action not in ['approve', 'reject']:
-        return jsonify({'error': 'Action must be approve or reject'}), 400
+    if action not in ['approve', 'reject', 'approve_withdrawal', 'reject_withdrawal']:
+        return jsonify({'error': 'Invalid review action'}), 400
 
-    leave_req.status = 'approved' if action == 'approve' else 'rejected'
-    leave_req.manager_comment = comment
-    leave_req.reviewed_at = datetime.utcnow()
+    start_dt = datetime.strptime(leave_req.start_date, '%Y-%m-%d')
+    end_dt = datetime.strptime(leave_req.end_date, '%Y-%m-%d')
+    num_days = (end_dt - start_dt).days + 1
+    target_emp = Employee.query.get(leave_req.employee_id)
 
-    # If approved, update attendance records to on_leave for that date range and deduct leave balance
-    if action == 'approve':
-        try:
-            start_dt = datetime.strptime(leave_req.start_date, '%Y-%m-%d')
-            end_dt = datetime.strptime(leave_req.end_date, '%Y-%m-%d')
-            num_days = (end_dt - start_dt).days + 1
+    # Handling Withdrawal Request Review
+    if leave_req.status == 'withdrawal_requested':
+        if action in ['approve', 'approve_withdrawal']:
+            leave_req.status = 'withdrawn'
+            leave_req.manager_comment = comment
+            leave_req.reviewed_at = datetime.utcnow()
 
-            target_emp = Employee.query.get(leave_req.employee_id)
+            # Credit back leave balance
+            if target_emp:
+                l_type = leave_req.leave_type
+                if l_type == 'Casual Leave':
+                    target_emp.casual_leave_balance = (getattr(target_emp, 'casual_leave_balance', 12.0) or 0.0) + num_days
+                elif l_type == 'Sick Leave':
+                    target_emp.sick_leave_balance = (getattr(target_emp, 'sick_leave_balance', 12.0) or 0.0) + num_days
+                elif l_type == 'Paid Leave':
+                    target_emp.paid_leave_balance = (getattr(target_emp, 'paid_leave_balance', 15.0) or 0.0) + num_days
+                elif l_type in ['Compensatory Off (C-Off)', 'C-Off']:
+                    target_emp.coff_balance = (getattr(target_emp, 'coff_balance', 0.0) or 0.0) + num_days
+
+            # Clear on_leave attendance records
+            curr_dt = start_dt
+            while curr_dt <= end_dt:
+                d_str = curr_dt.strftime('%Y-%m-%d')
+                rec = AttendanceRecord.query.filter_by(employee_id=leave_req.employee_id, date=d_str).first()
+                if rec and rec.status == 'on_leave':
+                    if not rec.punch_in_time:
+                        db.session.delete(rec)
+                    else:
+                        rec.status = 'on_time'
+                curr_dt += timedelta(days=1)
+
+            message_str = f"Super Admin approved leave withdrawal for Employee {leave_req.employee_id}."
+        else:
+            # Reject withdrawal -> revert status to approved
+            leave_req.status = 'approved'
+            leave_req.manager_comment = comment
+            leave_req.reviewed_at = datetime.utcnow()
+            message_str = f"Super Admin rejected leave withdrawal request for Employee {leave_req.employee_id}."
+
+    # Handling Normal Pending Leave Review
+    else:
+        if action in ['approve', 'approve_withdrawal']:
+            leave_req.status = 'approved'
+            leave_req.manager_comment = comment
+            leave_req.reviewed_at = datetime.utcnow()
+
+            # Deduct leave balance
             if target_emp:
                 l_type = leave_req.leave_type
                 if l_type == 'Casual Leave':
@@ -475,6 +594,7 @@ def admin_review_leave_request(req_id):
                 elif l_type in ['Compensatory Off (C-Off)', 'C-Off']:
                     target_emp.coff_balance = max(0.0, (getattr(target_emp, 'coff_balance', 0.0) or 0.0) - num_days)
 
+            # Create/update on_leave attendance records
             curr_dt = start_dt
             while curr_dt <= end_dt:
                 d_str = curr_dt.strftime('%Y-%m-%d')
@@ -490,21 +610,26 @@ def admin_review_leave_request(req_id):
                     )
                     db.session.add(rec)
                 curr_dt += timedelta(days=1)
-        except Exception as e:
-            print(f"Error updating leave attendance records: {e}")
+
+            message_str = f"Super Admin approved Leave Request #{req_id}."
+        else:
+            leave_req.status = 'rejected'
+            leave_req.manager_comment = comment
+            leave_req.reviewed_at = datetime.utcnow()
+            message_str = f"Super Admin rejected Leave Request #{req_id}."
 
     db.session.commit()
 
     log_audit(
         admin_id,
         admin_name,
-        f"Super Admin {action.capitalize()}d Leave Request #{req_id} for Employee {leave_req.employee_id}",
+        f"Super Admin Reviewed Leave Request #{req_id} ({action}) for Employee {leave_req.employee_id}",
         "LeaveRequest",
         str(req_id)
     )
 
     return jsonify({
-        'message': f'Leave request successfully {leave_req.status} by Super Admin.',
+        'message': message_str,
         'leaveRequest': leave_req.to_dict()
     }), 200
 

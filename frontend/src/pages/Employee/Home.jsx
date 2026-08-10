@@ -33,6 +33,11 @@ export default function Home() {
   const [managedRequests, setManagedRequests] = useState([]);
   const [reviewingId, setReviewingId] = useState(null);
 
+  // Leave Withdrawal state
+  const [withdrawModalReq, setWithdrawModalReq] = useState(null);
+  const [withdrawReason, setWithdrawReason] = useState('');
+  const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -244,6 +249,42 @@ export default function Home() {
       alert("Review failed: " + err.message);
     } finally {
       setReviewingId(null);
+    }
+  };
+
+  const handleRequestWithdraw = async (e) => {
+    e.preventDefault();
+    if (!withdrawModalReq) return;
+    setSubmittingWithdraw(true);
+    try {
+      const res = await apiFetch(`/employee/leave-requests/${withdrawModalReq.id}/withdraw`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: withdrawReason })
+      });
+      alert(res.message);
+      setWithdrawModalReq(null);
+      setWithdrawReason('');
+      fetchLeaveData();
+      fetchTodayStatus();
+    } catch (err) {
+      alert("Withdrawal request failed: " + err.message);
+    } finally {
+      setSubmittingWithdraw(false);
+    }
+  };
+
+  const handleCancelPendingLeave = async (reqId) => {
+    if (!window.confirm("Are you sure you want to cancel this pending leave request?")) return;
+    try {
+      const res = await apiFetch(`/employee/leave-requests/${reqId}/withdraw`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'Cancelled by employee' })
+      });
+      alert(res.message);
+      fetchLeaveData();
+      fetchTodayStatus();
+    } catch (err) {
+      alert("Failed to cancel leave request: " + err.message);
     }
   };
 
@@ -477,7 +518,26 @@ export default function Home() {
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {req.status === 'pending' ? (
+                        {req.status === 'withdrawal_requested' ? (
+                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => handleReviewLeave(req.id, 'approve_withdrawal')}
+                              className="apc-btn apc-btn-primary"
+                              style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem' }}
+                              disabled={reviewingId === req.id}
+                            >
+                              <Check size={14} /> Approve Withdrawal
+                            </button>
+                            <button
+                              onClick={() => handleReviewLeave(req.id, 'reject_withdrawal')}
+                              className="apc-btn apc-btn-danger"
+                              style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem' }}
+                              disabled={reviewingId === req.id}
+                            >
+                              <X size={14} /> Reject Withdrawal
+                            </button>
+                          </div>
+                        ) : req.status === 'pending' ? (
                           <>
                             <button
                               onClick={() => handleReviewLeave(req.id, 'approve')}
@@ -497,9 +557,7 @@ export default function Home() {
                             </button>
                           </>
                         ) : (
-                          <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', color: req.status === 'approved' ? 'var(--apc-success)' : 'var(--apc-danger)' }}>
-                            {req.status}
-                          </span>
+                          <StatusBadge status={req.status} />
                         )}
                       </div>
                     </div>
@@ -517,18 +575,75 @@ export default function Home() {
               <FileText size={16} color="var(--apc-text-secondary)" /> My Submitted Leave Requests
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {myLeaveRequests.slice(0, 5).map(req => (
-                <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
+              {myLeaveRequests.slice(0, 10).map(req => (
+                <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div>
                     <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{req.leaveType}</span>
                     <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', marginLeft: '8px' }}>({req.startDate} to {req.endDate})</span>
-                    <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>Manager: {req.reportingManagerName || 'Super Admin'}</span>
+                    <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>
+                      Manager: {req.reportingManagerName || 'Super Admin'} {req.withdrawReason ? `· Withdrawal Note: "${req.withdrawReason}"` : ''}
+                    </span>
                   </div>
-                  <span className={`apc-badge apc-badge-${req.status === 'approved' ? 'on_time' : req.status === 'rejected' ? 'late' : 'in_buffer'}`} style={{ textTransform: 'capitalize' }}>
-                    {req.status}
-                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <StatusBadge status={req.status} />
+                    {req.status === 'approved' && (
+                      <button
+                        onClick={() => { setWithdrawModalReq(req); setWithdrawReason(''); }}
+                        className="apc-btn apc-btn-secondary"
+                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                      >
+                        Request Withdrawal
+                      </button>
+                    )}
+                    {req.status === 'pending' && (
+                      <button
+                        onClick={() => handleCancelPendingLeave(req.id)}
+                        className="apc-btn apc-btn-danger"
+                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                      >
+                        Cancel Request
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* REQUEST LEAVE WITHDRAWAL MODAL */}
+        {withdrawModalReq && (
+          <div className="apc-modal-overlay">
+            <div className="apc-modal" style={{ maxWidth: '440px' }}>
+              <h3>Request Leave Withdrawal</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--apc-text-secondary)', margin: '0.5rem 0 1rem 0' }}>
+                Requesting to cancel approved <strong>{withdrawModalReq.leaveType}</strong> ({withdrawModalReq.startDate} to {withdrawModalReq.endDate}). This request will go to <strong>{withdrawModalReq.reportingManagerName || 'Super Admin'}</strong> for approval.
+              </p>
+
+              <form onSubmit={handleRequestWithdraw}>
+                <div className="apc-form-group">
+                  <label htmlFor="withdrawReasonInput">Emergency / Withdrawal Reason <span className="required">*</span></label>
+                  <textarea
+                    id="withdrawReasonInput"
+                    className="apc-textarea"
+                    rows={3}
+                    placeholder="e.g. Returned from travel early / urgent work requirement"
+                    value={withdrawReason}
+                    onChange={e => setWithdrawReason(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+                  <button type="button" onClick={() => setWithdrawModalReq(null)} className="apc-btn apc-btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" className="apc-btn apc-btn-primary" disabled={submittingWithdraw}>
+                    {submittingWithdraw ? 'Submitting...' : 'Submit Withdrawal Request'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

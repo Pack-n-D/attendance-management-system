@@ -199,11 +199,33 @@ a:hover {
 }
 .apc-badge-absent .apc-badge-dot, .apc-badge-inactive .apc-badge-dot { background-color: var(--apc-text-secondary); }
 
-.apc-badge-active {
+.apc-badge-active, .apc-badge-approved {
   background-color: var(--apc-success-bg);
   color: var(--apc-success);
   border: 1px solid rgba(46, 158, 91, 0.25);
 }
+.apc-badge-active .apc-badge-dot, .apc-badge-approved .apc-badge-dot { background-color: var(--apc-success); }
+
+.apc-badge-pending, .apc-badge-withdrawal_requested {
+  background-color: var(--apc-warning-bg);
+  color: var(--apc-warning);
+  border: 1px solid rgba(226, 163, 59, 0.3);
+}
+.apc-badge-pending .apc-badge-dot, .apc-badge-withdrawal_requested .apc-badge-dot { background-color: var(--apc-warning); }
+
+.apc-badge-rejected {
+  background-color: var(--apc-danger-bg);
+  color: var(--apc-danger);
+  border: 1px solid rgba(214, 69, 69, 0.25);
+}
+.apc-badge-rejected .apc-badge-dot { background-color: var(--apc-danger); }
+
+.apc-badge-withdrawn {
+  background-color: #F0ECE6;
+  color: var(--apc-text-secondary);
+  border: 1px solid var(--apc-border);
+}
+.apc-badge-withdrawn .apc-badge-dot { background-color: var(--apc-text-secondary); }
 
 /* Forms */
 .apc-form-group {

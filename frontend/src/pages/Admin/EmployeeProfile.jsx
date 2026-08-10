@@ -5,7 +5,7 @@ import Avatar from '../../components/Avatar';
 import { apiFetch, exportAttendanceCSV } from '../../utils/api';
 import { DEPARTMENTS } from '../../utils/constants';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, FileText, Calendar, Key, RefreshCw, Power, Download, Save, Check, Trash2, Camera } from 'lucide-react';
+import { ArrowLeft, User, FileText, Calendar, Key, RefreshCw, Power, Download, Save, Check, Trash2, Camera, Upload } from 'lucide-react';
 
 export default function EmployeeProfile() {
   const { id } = useParams();
@@ -15,6 +15,7 @@ export default function EmployeeProfile() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingDocType, setUploadingDocType] = useState(null);
 
   // Edit states for overview
   const [editingOverview, setEditingOverview] = useState(false);
@@ -23,6 +24,43 @@ export default function EmployeeProfile() {
   // Reset password popup
   const [resetModalData, setResetModalData] = useState(null);
   const fileInputRef = useRef(null);
+
+  const handleDocUpload = (docType, file) => {
+    if (!file) return;
+    setUploadingDocType(docType);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        await apiFetch(`/admin/employees/${id}/documents`, {
+          method: 'POST',
+          body: JSON.stringify({
+            docType,
+            fileName: file.name,
+            fileData: e.target.result
+          })
+        });
+        fetchProfileDetail();
+      } catch (err) {
+        alert("Document upload failed: " + err.message);
+      } finally {
+        setUploadingDocType(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteDocument = async (docId, docType) => {
+    if (!window.confirm(`Are you sure you want to delete the ${docType.toUpperCase()} document for this employee?`)) {
+      return;
+    }
+    try {
+      await apiFetch(`/admin/employees/${id}/documents/${docId}`, { method: 'DELETE' });
+      fetchProfileDetail();
+    } catch (err) {
+      alert("Failed to delete document: " + err.message);
+    }
+  };
 
   const handleAdminPhotoUpload = (e) => {
     const file = e.target.files[0];
@@ -507,22 +545,80 @@ export default function EmployeeProfile() {
             <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--apc-border)', paddingBottom: '0.5rem' }}>
               Uploaded Compliance Documents
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="apc-grid-3col">
               {['aadhaar', 'pan', 'education'].map(docType => {
                 const doc = docs.find(d => d.type === docType);
+                const inputId = `doc-file-input-${docType}`;
+                const isUploading = uploadingDocType === docType;
+
                 return (
-                  <div key={docType} style={{ padding: '1rem', border: '1px solid var(--apc-border)', borderRadius: 'var(--apc-radius-sm)', background: 'var(--apc-bg)' }}>
-                    <h4 style={{ textTransform: 'uppercase', fontSize: '0.9rem', marginBottom: '0.5rem' }}>{docType} Document</h4>
-                    {doc ? (
-                      <div>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', marginBottom: '0.5rem' }}>{doc.fileName}</p>
-                        <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="apc-btn apc-btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}>
-                          <Download size={14} /> Download File
-                        </a>
+                  <div key={docType} style={{ padding: '1rem', border: '1px solid var(--apc-border)', borderRadius: 'var(--apc-radius-sm)', background: 'var(--apc-bg)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <h4 style={{ textTransform: 'uppercase', fontSize: '0.9rem', margin: 0, color: 'var(--apc-text-primary)' }}>{docType} Document</h4>
+                        {doc && <span style={{ fontSize: '0.72rem', background: 'var(--apc-success-bg)', color: 'var(--apc-success)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(46,158,91,0.3)', fontWeight: 600 }}>Uploaded</span>}
                       </div>
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)' }}>No document uploaded</span>
-                    )}
+
+                      {doc ? (
+                        <div>
+                          <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--apc-text-primary)', wordBreak: 'break-all', marginBottom: '0.25rem' }}>{doc.fileName}</p>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', margin: 0 }}>
+                            Uploaded: {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'N/A'} {doc.uploadedBy ? `by ${doc.uploadedBy}` : ''}
+                          </p>
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: '0.82rem', color: 'var(--apc-text-secondary)', margin: 0 }}>No document uploaded yet.</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <input
+                        id={inputId}
+                        type="file"
+                        accept=".pdf,image/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleDocUpload(docType, e.target.files[0]);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+
+                      {doc ? (
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="apc-btn apc-btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', flex: 1, justifyContent: 'center' }}>
+                            <Download size={14} /> Download
+                          </a>
+                          <button
+                            onClick={() => document.getElementById(inputId)?.click()}
+                            className="apc-btn apc-btn-secondary"
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                            disabled={isUploading}
+                            title="Replace Document File"
+                          >
+                            <Upload size={14} /> {isUploading ? 'Uploading...' : 'Replace'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDocument(doc.id, docType)}
+                            className="apc-btn apc-btn-danger"
+                            style={{ padding: '0.3rem 0.55rem', fontSize: '0.78rem' }}
+                            title="Delete Document"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => document.getElementById(inputId)?.click()}
+                          className="apc-btn apc-btn-primary"
+                          style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', width: '100%' }}
+                          disabled={isUploading}
+                        >
+                          <Upload size={14} /> {isUploading ? 'Uploading...' : `Upload ${docType.toUpperCase()} File`}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}

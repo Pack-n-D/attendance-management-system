@@ -215,6 +215,21 @@ class APCTestSuite(unittest.TestCase):
         self.assertEqual(res_review.status_code, 200)
         self.assertEqual(res_review.get_json()['leaveRequest']['status'], 'approved')
 
+        # 6. Shivnath requests withdrawal for the approved leave due to emergency
+        res_withdraw_req = self.client.post(f'/api/employee/leave-requests/{req_id}/withdraw', json={
+            'reason': 'Emergency project requirement'
+        }, headers=shiv_headers)
+        self.assertEqual(res_withdraw_req.status_code, 200)
+        self.assertEqual(res_withdraw_req.get_json()['leaveRequest']['status'], 'withdrawal_requested')
+
+        # 7. Karan approves Shivnath's withdrawal request
+        res_withdraw_appr = self.client.post(f'/api/employee/leave-requests/{req_id}/review', json={
+            'action': 'approve_withdrawal',
+            'comment': 'Withdrawal approved'
+        }, headers=karan_headers)
+        self.assertEqual(res_withdraw_appr.status_code, 200)
+        self.assertEqual(res_withdraw_appr.get_json()['leaveRequest']['status'], 'withdrawn')
+
 if __name__ == '__main__':
     unittest.main()
 

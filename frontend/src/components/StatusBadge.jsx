@@ -9,7 +9,12 @@ const STATUS_LABELS = {
   half_day: 'Half Day',
   active: 'Active',
   inactive: 'Inactive',
-  not_punched: 'Not Punched'
+  not_punched: 'Not Punched',
+  pending: 'Pending Approval',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  withdrawal_requested: 'Withdraw Requested',
+  withdrawn: 'Withdrawn'
 };
 
 export default function StatusBadge({ status }) {

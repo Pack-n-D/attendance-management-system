@@ -196,6 +196,44 @@ def get_managed_leave_requests():
     }), 200
 
 
+@employee_bp.route('/leave-requests/<int:req_id>/withdraw', methods=['POST'])
+@jwt_required()
+def request_leave_withdrawal(req_id):
+    user_id = get_jwt_identity()
+    leave_req = LeaveRequest.query.get(req_id)
+    if not leave_req:
+        return jsonify({'error': 'Leave request not found'}), 404
+
+    if leave_req.employee_id != user_id:
+        return jsonify({'error': 'Unauthorized. This leave request does not belong to you.'}), 403
+
+    data = request.get_json() or {}
+    withdraw_reason = data.get('reason', '').strip()
+
+    if leave_req.status == 'pending':
+        leave_req.status = 'withdrawn'
+        leave_req.withdraw_reason = withdraw_reason or 'Cancelled by employee'
+        db.session.commit()
+        log_audit(user_id, "Employee", f"Cancelled pending Leave Request #{req_id}", "LeaveRequest", str(req_id))
+        return jsonify({
+            'message': 'Pending leave request cancelled successfully.',
+            'leaveRequest': leave_req.to_dict()
+        }), 200
+
+    elif leave_req.status == 'approved':
+        leave_req.status = 'withdrawal_requested'
+        leave_req.withdraw_reason = withdraw_reason or 'Emergency / Change of plans'
+        db.session.commit()
+        log_audit(user_id, "Employee", f"Requested withdrawal for approved Leave Request #{req_id}", "LeaveRequest", str(req_id))
+        return jsonify({
+            'message': 'Leave withdrawal request submitted to reporting manager.',
+            'leaveRequest': leave_req.to_dict()
+        }), 200
+
+    else:
+        return jsonify({'error': f'Cannot withdraw leave with current status ({leave_req.status}).'}), 400
+
+
 @employee_bp.route('/leave-requests/<int:req_id>/review', methods=['POST'])
 @jwt_required()
 def review_leave_request(req_id):
@@ -213,24 +251,64 @@ def review_leave_request(req_id):
         return jsonify({'error': 'Unauthorized. You are not the assigned reporting manager for this request.'}), 403
 
     data = request.get_json() or {}
-    action = data.get('action')  # 'approve' or 'reject'
+    action = data.get('action')  # 'approve', 'reject', 'approve_withdrawal', 'reject_withdrawal'
     comment = data.get('comment', '')
 
-    if action not in ['approve', 'reject']:
-        return jsonify({'error': 'Action must be approve or reject'}), 400
+    if action not in ['approve', 'reject', 'approve_withdrawal', 'reject_withdrawal']:
+        return jsonify({'error': 'Invalid review action'}), 400
 
-    leave_req.status = 'approved' if action == 'approve' else 'rejected'
-    leave_req.manager_comment = comment
-    leave_req.reviewed_at = datetime.utcnow()
+    start_dt = datetime.strptime(leave_req.start_date, '%Y-%m-%d')
+    end_dt = datetime.strptime(leave_req.end_date, '%Y-%m-%d')
+    num_days = (end_dt - start_dt).days + 1
+    target_emp = Employee.query.get(leave_req.employee_id)
 
-    # If approved, update attendance records to on_leave for that date range and deduct leave balance
-    if action == 'approve':
-        try:
-            start_dt = datetime.strptime(leave_req.start_date, '%Y-%m-%d')
-            end_dt = datetime.strptime(leave_req.end_date, '%Y-%m-%d')
-            num_days = (end_dt - start_dt).days + 1
+    # Handling Withdrawal Request Review
+    if leave_req.status == 'withdrawal_requested':
+        if action in ['approve', 'approve_withdrawal']:
+            leave_req.status = 'withdrawn'
+            leave_req.manager_comment = comment
+            leave_req.reviewed_at = datetime.utcnow()
 
-            target_emp = Employee.query.get(leave_req.employee_id)
+            # Credit back leave balance
+            if target_emp:
+                l_type = leave_req.leave_type
+                if l_type == 'Casual Leave':
+                    target_emp.casual_leave_balance = (getattr(target_emp, 'casual_leave_balance', 12.0) or 0.0) + num_days
+                elif l_type == 'Sick Leave':
+                    target_emp.sick_leave_balance = (getattr(target_emp, 'sick_leave_balance', 12.0) or 0.0) + num_days
+                elif l_type == 'Paid Leave':
+                    target_emp.paid_leave_balance = (getattr(target_emp, 'paid_leave_balance', 15.0) or 0.0) + num_days
+                elif l_type in ['Compensatory Off (C-Off)', 'C-Off']:
+                    target_emp.coff_balance = (getattr(target_emp, 'coff_balance', 0.0) or 0.0) + num_days
+
+            # Clear on_leave attendance records
+            curr_dt = start_dt
+            while curr_dt <= end_dt:
+                d_str = curr_dt.strftime('%Y-%m-%d')
+                rec = AttendanceRecord.query.filter_by(employee_id=leave_req.employee_id, date=d_str).first()
+                if rec and rec.status == 'on_leave':
+                    if not rec.punch_in_time:
+                        db.session.delete(rec)
+                    else:
+                        rec.status = 'on_time'
+                curr_dt += timedelta(days=1)
+
+            message_str = f"Approved leave withdrawal for Employee {leave_req.employee_id}."
+        else:
+            # Reject withdrawal -> revert status to approved
+            leave_req.status = 'approved'
+            leave_req.manager_comment = comment
+            leave_req.reviewed_at = datetime.utcnow()
+            message_str = f"Rejected leave withdrawal request for Employee {leave_req.employee_id}."
+
+    # Handling Normal Pending Leave Review
+    else:
+        if action in ['approve', 'approve_withdrawal']:
+            leave_req.status = 'approved'
+            leave_req.manager_comment = comment
+            leave_req.reviewed_at = datetime.utcnow()
+
+            # Deduct leave balance
             if target_emp:
                 l_type = leave_req.leave_type
                 if l_type == 'Casual Leave':
@@ -242,6 +320,7 @@ def review_leave_request(req_id):
                 elif l_type in ['Compensatory Off (C-Off)', 'C-Off']:
                     target_emp.coff_balance = max(0.0, (getattr(target_emp, 'coff_balance', 0.0) or 0.0) - num_days)
 
+            # Create/update on_leave attendance records
             curr_dt = start_dt
             while curr_dt <= end_dt:
                 d_str = curr_dt.strftime('%Y-%m-%d')
@@ -257,21 +336,26 @@ def review_leave_request(req_id):
                     )
                     db.session.add(rec)
                 curr_dt += timedelta(days=1)
-        except Exception as e:
-            print(f"Error marking leave records: {e}")
+
+            message_str = f"Approved Leave Request #{req_id}."
+        else:
+            leave_req.status = 'rejected'
+            leave_req.manager_comment = comment
+            leave_req.reviewed_at = datetime.utcnow()
+            message_str = f"Rejected Leave Request #{req_id}."
 
     db.session.commit()
 
     log_audit(
         user_id,
         f"{reviewer.first_name} {reviewer.last_name}",
-        f"{action.capitalize()}d Leave Request #{req_id} for Employee {leave_req.employee_id}",
+        f"Reviewed Leave Request #{req_id} ({action}) for Employee {leave_req.employee_id}",
         "LeaveRequest",
         str(req_id)
     )
 
     return jsonify({
-        'message': f'Leave request successfully {leave_req.status}.',
+        'message': message_str,
         'leaveRequest': leave_req.to_dict()
     }), 200
 
