@@ -325,8 +325,7 @@ def calculate_monthly_salary_slip(employee, month_str: str) -> dict:
     paid_leaves = on_leave_count
 
     per_day_rate = base_salary / working_days if working_days > 0 else 0.0
-    hourly_rate = per_day_rate / 8.0 if per_day_rate > 0 else 0.0
-    overtime_rate = hourly_rate * 1.5
+    overtime_rate = 150.0  # Fixed ₹150/hr flat rate as per company policy
     overtime_pay = overtime_hours * overtime_rate
 
     total_covered_days = present_days + paid_leaves

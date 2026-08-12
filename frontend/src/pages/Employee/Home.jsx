@@ -763,7 +763,7 @@ export default function Home() {
                         <td style={{ textAlign: 'right', color: 'var(--apc-danger)', fontWeight: 600 }}>- ₹{salarySlip.unpaidDeductions.toLocaleString('en-IN')}</td>
                       </tr>
                       <tr>
-                        <td>Overtime Pay ({salarySlip.overtimeHours} hrs @ 1.5x)</td>
+                        <td>Overtime Pay ({salarySlip.overtimeHours} hrs @ ₹150/hr)</td>
                         <td style={{ textAlign: 'right', color: 'var(--apc-success)', fontWeight: 600 }}>+ ₹{salarySlip.overtimePay.toLocaleString('en-IN')}</td>
                         <td>Taxes / Statutory</td>
                         <td style={{ textAlign: 'right' }}>₹0.00</td>
