@@ -34,19 +34,22 @@ def update_rules():
     data = request.get_json() or {}
     
     rule = AttendanceRule(
-        ideal_punch_in_time=data.get('idealPunchInTime', '09:30'),
+        ideal_punch_in_time=data.get('idealPunchInTime', '10:00'),
         ideal_punch_out_time=data.get('idealPunchOutTime', '18:30'),
         buffer_minutes_in=int(data.get('bufferMinutesIn', 15)),
         buffer_minutes_out=int(data.get('bufferMinutesOut', 15)),
         weekly_offs=",".join(data.get('weeklyOffs', ['Saturday', 'Sunday'])),
         half_day_threshold_in=data.get('halfDayThresholdIn', '12:00'),
+        second_half_start_time=data.get('secondHalfStartTime', '13:00'),
+        second_half_end_time=data.get('secondHalfEndTime', '18:30'),
+        second_half_min_punch_out=data.get('secondHalfMinPunchOut', '18:30'),
         effective_from=datetime.utcnow().strftime('%Y-%m-%d')
     )
 
     db.session.add(rule)
     db.session.commit()
 
-    log_audit(admin_id, admin_name, f"Updated Attendance Rules (Ideal In: {rule.ideal_punch_in_time}, Buffer: {rule.buffer_minutes_in}m)", "AttendanceRule", str(rule.id))
+    log_audit(admin_id, admin_name, f"Updated Attendance Rules (Ideal In: {rule.ideal_punch_in_time}, 2nd Half: {rule.second_half_start_time}-{rule.second_half_end_time})", "AttendanceRule", str(rule.id))
 
     return jsonify({
         'message': 'Attendance rules updated successfully (effective from today forward)',

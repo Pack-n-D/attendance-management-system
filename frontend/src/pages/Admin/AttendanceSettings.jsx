@@ -7,12 +7,17 @@ import { Settings, Clock, Plus, Trash2, Save, Info, KeyRound } from 'lucide-reac
 
 export default function AttendanceSettings() {
   const navigate = useNavigate();
-  const [idealPunchInTime, setIdealPunchInTime] = useState('09:30');
+  const [idealPunchInTime, setIdealPunchInTime] = useState('10:00');
   const [idealPunchOutTime, setIdealPunchOutTime] = useState('18:30');
   const [bufferMinutesIn, setBufferMinutesIn] = useState(15);
   const [bufferMinutesOut, setBufferMinutesOut] = useState(15);
   const [weeklyOffs, setWeeklyOffs] = useState(['Saturday', 'Sunday']);
   const [halfDayThresholdIn, setHalfDayThresholdIn] = useState('12:00');
+
+  // Second Half shift settings
+  const [secondHalfStartTime, setSecondHalfStartTime] = useState('13:00');
+  const [secondHalfEndTime, setSecondHalfEndTime] = useState('18:30');
+  const [secondHalfMinPunchOut, setSecondHalfMinPunchOut] = useState('18:30');
 
   const [holidays, setHolidays] = useState([]);
   const [newHolidayDate, setNewHolidayDate] = useState('');
@@ -50,12 +55,15 @@ export default function AttendanceSettings() {
       const ruleRes = await apiFetch('/settings/attendance-rules');
       const r = ruleRes.rule;
       if (r) {
-        setIdealPunchInTime(r.idealPunchInTime);
-        setIdealPunchOutTime(r.idealPunchOutTime);
-        setBufferMinutesIn(r.bufferMinutesIn);
-        setBufferMinutesOut(r.bufferMinutesOut);
+        setIdealPunchInTime(r.idealPunchInTime || '10:00');
+        setIdealPunchOutTime(r.idealPunchOutTime || '18:30');
+        setBufferMinutesIn(r.bufferMinutesIn || 15);
+        setBufferMinutesOut(r.bufferMinutesOut || 15);
         setWeeklyOffs(r.weeklyOffs || ['Saturday', 'Sunday']);
         setHalfDayThresholdIn(r.halfDayThresholdIn || '12:00');
+        setSecondHalfStartTime(r.secondHalfStartTime || '13:00');
+        setSecondHalfEndTime(r.secondHalfEndTime || '18:30');
+        setSecondHalfMinPunchOut(r.secondHalfMinPunchOut || '18:30');
       }
 
       const holRes = await apiFetch('/settings/holidays');
@@ -77,7 +85,7 @@ export default function AttendanceSettings() {
       const period = endH >= 12 ? 'PM' : 'AM';
       const formattedH = endH % 12 || 12;
       const formattedM = endM < 10 ? `0${endM}` : endM;
-      return `Punch-in after ${formattedH}:${formattedM} ${period} will be marked Late.`;
+      return `First Half / Full Day: In by 10:00 AM (${formattedH}:${formattedM} ${period} late cutoff). Second Half: In by 1:00 PM (${secondHalfStartTime} - ${secondHalfEndTime}).`;
     } catch (e) {
       return '';
     }
@@ -97,7 +105,10 @@ export default function AttendanceSettings() {
           bufferMinutesIn,
           bufferMinutesOut,
           weeklyOffs,
-          halfDayThresholdIn
+          halfDayThresholdIn,
+          secondHalfStartTime,
+          secondHalfEndTime,
+          secondHalfMinPunchOut
         })
       });
       setSuccessMsg(res.message);
@@ -247,7 +258,7 @@ export default function AttendanceSettings() {
                 </div>
 
                 <div className="apc-form-group" style={{ gridColumn: 'span 2' }}>
-                  <label htmlFor="halfDay">Half-Day Threshold (Punch-In After)</label>
+                  <label htmlFor="halfDay">Half-Day Threshold (Full Day Late Threshold)</label>
                   <input
                     id="halfDay"
                     type="time"
@@ -255,7 +266,58 @@ export default function AttendanceSettings() {
                     value={halfDayThresholdIn}
                     onChange={e => setHalfDayThresholdIn(e.target.value)}
                   />
-                  <p className="apc-helper-text">Punches recorded after this time will be marked as Half Day instead of Late.</p>
+                  <p className="apc-helper-text">Full-day punches recorded after this time will be marked as Half Day instead of Late.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Second Half (Half Day) Shift Rules Card */}
+            <div className="apc-card" style={{ marginBottom: '1.5rem', borderLeft: '4px solid var(--apc-primary)' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--apc-border)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Clock size={18} color="var(--apc-primary)" /> Second Half (Half Day Shift) Rules
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)', marginBottom: '1.25rem' }}>
+                When an employee chooses <strong>Second Half (Half Day)</strong> during punch-in, punching in around 1:00 PM is marked as Half Day (not Late). If they punch out before the required punch-out time (e.g. 5:00 PM), status converts to Leave.
+              </p>
+
+              <div className="apc-grid-2col" style={{ gap: '1.25rem' }}>
+                <div className="apc-form-group">
+                  <label htmlFor="shStart">Second Half Punch-In Start Time</label>
+                  <input
+                    id="shStart"
+                    type="time"
+                    className="apc-input"
+                    value={secondHalfStartTime}
+                    onChange={e => setSecondHalfStartTime(e.target.value)}
+                    required
+                  />
+                  <p className="apc-helper-text">Standard second half shift start (e.g., 13:00 / 1:00 PM).</p>
+                </div>
+
+                <div className="apc-form-group">
+                  <label htmlFor="shEnd">Second Half Punch-Out Time</label>
+                  <input
+                    id="shEnd"
+                    type="time"
+                    className="apc-input"
+                    value={secondHalfEndTime}
+                    onChange={e => setSecondHalfEndTime(e.target.value)}
+                    required
+                  />
+                  <p className="apc-helper-text">Standard second half shift end (e.g., 18:30 / 6:30 PM).</p>
+                </div>
+
+                <div className="apc-form-group" style={{ gridColumn: 'span 2' }}>
+                  <label htmlFor="shMinOut">Second Half Minimum Punch-Out Threshold</label>
+                  <input
+                    id="shMinOut"
+                    type="time"
+                    className="apc-input"
+                    value={secondHalfMinPunchOut}
+                    onChange={e => setSecondHalfMinPunchOut(e.target.value)}
+                    required
+                  />
+                  <p className="apc-helper-text">Punching out before this time (e.g. 5:00 PM / 5:30 PM) invalidates the half-day shift and converts status to Leave.</p>
                 </div>
               </div>
             </div>

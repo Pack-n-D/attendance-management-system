@@ -68,6 +68,9 @@ def punch_in():
     photo_base64 = data.get('photo')
     location = data.get('location')
     late_reason = data.get('lateReason', '').strip()
+    shift_type = data.get('shiftType', 'full_day')
+    if shift_type not in ['full_day', 'second_half']:
+        shift_type = 'full_day'
 
     # Get current active rule
     rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
@@ -75,7 +78,7 @@ def punch_in():
         rule = AttendanceRule()
 
     # Compute status server-side
-    status, requires_reason = compute_attendance_status(now_time_str, today_str, rule)
+    status, requires_reason = compute_attendance_status(now_time_str, today_str, rule, shift_type=shift_type)
 
     # Validate late reason if required
     if requires_reason and not late_reason:
@@ -94,6 +97,7 @@ def punch_in():
             punch_in_photo_url=photo_url,
             punch_in_location=location,
             status=status,
+            shift_type=shift_type,
             late_reason=late_reason if requires_reason else None
         )
         db.session.add(record)
@@ -103,12 +107,13 @@ def punch_in():
         record.punch_in_photo_url = photo_url
         record.punch_in_location = location
         record.status = status
+        record.shift_type = shift_type
         record.late_reason = late_reason if requires_reason else None
 
     db.session.commit()
 
     return jsonify({
-        'message': f"Punched in successfully at {now_time_str}",
+        'message': f"Punched in successfully at {now_time_str} ({'Second Half / Half Day' if shift_type == 'second_half' else 'Full Day'})",
         'recordedTime': now_time_str,
         'status': status,
         'record': record.to_dict()
@@ -124,30 +129,42 @@ def punch_out():
     today_str = get_current_date_str()
     now_time_str = client_time if (client_time and len(client_time) >= 5) else get_current_time_str()
 
+    rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
+    if not rule:
+        rule = AttendanceRule()
+
     record = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
     if not record:
-        rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
-        ideal_in = rule.ideal_punch_in_time + ":00" if rule else "09:30:00"
+        ideal_in = getattr(rule, 'ideal_punch_in_time', '10:00') + ":00"
         record = AttendanceRecord(
             employee_id=user_id,
             date=today_str,
             punch_in_time=ideal_in,
-            status='on_time'
+            status='on_time',
+            shift_type='full_day'
         )
         db.session.add(record)
     elif not record.punch_in_time:
-        rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
-        record.punch_in_time = rule.ideal_punch_in_time + ":00" if rule else "09:30:00"
+        ideal_in = getattr(rule, 'ideal_punch_in_time', '10:00') + ":00"
+        record.punch_in_time = ideal_in
 
     if record.punch_out_time:
         return jsonify({'error': f'Already punched out today at {record.punch_out_time}'}), 400
 
-    data = request.get_json() or {}
     photo_base64 = data.get('photo')
-
     photo_url = save_base64_photo(photo_base64, folder_name=f"punch_out_{user_id}")
 
     record.punch_out_time = now_time_str
+    record.punch_out_photo_url = photo_url
+
+    # Check Second Half early punch out rule:
+    # If punching out before required second half min punch out (e.g. 18:30), mark status as on_leave (unfulfilled half day)
+    st = getattr(record, 'shift_type', 'full_day') or 'full_day'
+    if st == 'second_half':
+        min_out = getattr(rule, 'second_half_min_punch_out', '18:30') or '18:30'
+        current_out_short = now_time_str[:5] if len(now_time_str) >= 5 else "00:00"
+        if current_out_short < min_out:
+            record.status = 'on_leave'
     record.punch_out_photo_url = photo_url
 
     # Check if working on a holiday or weekly off to credit C-Off

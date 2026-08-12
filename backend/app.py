@@ -88,6 +88,28 @@ def create_app():
                 except Exception:
                     db.session.rollback()
 
+            rule_cols = [
+                ("second_half_start_time", "VARCHAR(5) DEFAULT '13:00'"),
+                ("second_half_end_time", "VARCHAR(5) DEFAULT '18:30'"),
+                ("second_half_min_punch_out", "VARCHAR(5) DEFAULT '18:30'")
+            ]
+            for col_name, col_type in rule_cols:
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE attendance_rules ADD COLUMN {col_name} {col_type};"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+            rec_cols = [
+                ("shift_type", "VARCHAR(20) DEFAULT 'full_day'")
+            ]
+            for col_name, col_type in rec_cols:
+                try:
+                    db.session.execute(db.text(f"ALTER TABLE attendance_records ADD COLUMN {col_name} {col_type};"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
             from models import Employee, AttendanceRule
             from werkzeug.security import generate_password_hash
 

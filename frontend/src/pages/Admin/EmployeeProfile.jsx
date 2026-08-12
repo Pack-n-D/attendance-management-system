@@ -395,7 +395,7 @@ export default function EmployeeProfile() {
           <div className="apc-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.15rem' }}>MNC Employee Salary Slip</h3>
+                <h3 style={{ fontSize: '1.15rem' }}>Employee Salary Slip</h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)' }}>
                   Auto-calculated based on punch records, overtime, half days & leave deductions.
                 </p>
@@ -446,10 +446,10 @@ export default function EmployeeProfile() {
 
                 {/* Employee Meta Grid */}
                 <div className="apc-payslip-meta-grid" style={{ padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
-                  <div><strong>Employee ID:</strong> <br/><span style={{ fontFamily: 'monospace' }}>{emp?.id}</span></div>
-                  <div><strong>Employee Name:</strong> <br/>{emp?.fullName}</div>
-                  <div><strong>Department:</strong> <br/>{emp?.department}</div>
-                  <div><strong>Designation:</strong> <br/>{emp?.designation}</div>
+                  <div><strong>Employee ID:</strong> <br /><span style={{ fontFamily: 'monospace' }}>{emp?.id}</span></div>
+                  <div><strong>Employee Name:</strong> <br />{emp?.fullName}</div>
+                  <div><strong>Department:</strong> <br />{emp?.department}</div>
+                  <div><strong>Designation:</strong> <br />{emp?.designation}</div>
                 </div>
 
                 {/* Attendance Summary Grid */}

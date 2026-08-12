@@ -92,7 +92,7 @@ def generate_random_password(length=10) -> str:
     return "".join(pass_chars)
 
 
-def compute_attendance_status(punch_in_time_str: str, date_str: str, rule: AttendanceRule) -> tuple:
+def compute_attendance_status(punch_in_time_str: str, date_str: str, rule: AttendanceRule, shift_type: str = 'full_day') -> tuple:
     """
     Determines status: 'on_time', 'in_buffer', 'late', 'half_day', 'on_leave', 'absent'
     Returns (status_string, requires_late_reason_boolean)
@@ -110,18 +110,42 @@ def compute_attendance_status(punch_in_time_str: str, date_str: str, rule: Atten
         in_hour, in_minute, *rest = map(int, punch_in_time_str.split(':'))
         punch_time = time(in_hour, in_minute)
         
-        ideal_h, ideal_m = map(int, rule.ideal_punch_in_time.split(':'))
+        # Second Half shift calculation
+        if shift_type == 'second_half':
+            second_start = getattr(rule, 'second_half_start_time', '13:00') or '13:00'
+            sh_h, sh_m = map(int, second_start.split(':'))
+            
+            # Buffer for second half punch in
+            total_sh_minutes = sh_h * 60 + sh_m
+            buf = getattr(rule, 'buffer_minutes_in', 15) or 15
+            sh_buffer_end_minutes = total_sh_minutes + buf
+            sh_buffer_end_h = sh_buffer_end_minutes // 60
+            sh_buffer_end_m = sh_buffer_end_minutes % 60
+            sh_buffer_end_time = time(sh_buffer_end_h % 24, sh_buffer_end_m)
+            
+            if punch_time <= sh_buffer_end_time:
+                # Punching in around 1:00 PM for second half is NOT marked late, it is half_day without requiring late reason
+                return 'half_day', False
+            else:
+                # Punching in after 1:00 PM buffer requires a late reason
+                return 'half_day', True
+
+        # Full Day shift calculation
+        ideal_in = getattr(rule, 'ideal_punch_in_time', '10:00') or '10:00'
+        ideal_h, ideal_m = map(int, ideal_in.split(':'))
         ideal_time = time(ideal_h, ideal_m)
         
         # Buffer end time
+        buf = getattr(rule, 'buffer_minutes_in', 15) or 15
         total_ideal_minutes = ideal_h * 60 + ideal_m
-        buffer_end_minutes = total_ideal_minutes + rule.buffer_minutes_in
+        buffer_end_minutes = total_ideal_minutes + buf
         buffer_end_h = buffer_end_minutes // 60
         buffer_end_m = buffer_end_minutes % 60
-        buffer_end_time = time(buffer_end_h, buffer_end_m)
+        buffer_end_time = time(buffer_end_h % 24, buffer_end_m)
         
-        # Half day threshold
-        half_h, half_m = map(int, (rule.half_day_threshold_in or '12:00').split(':'))
+        # Half day threshold for full day punch-in
+        half_in = getattr(rule, 'half_day_threshold_in', '12:00') or '12:00'
+        half_h, half_m = map(int, half_in.split(':'))
         half_day_time = time(half_h, half_m)
         
         if punch_time <= ideal_time:

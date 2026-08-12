@@ -108,6 +108,7 @@ class AttendanceRecord(db.Model):
     punch_out_time = db.Column(db.String(8), nullable=True)  # HH:MM:SS
     punch_out_photo_url = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), nullable=False)  # 'on_time', 'in_buffer', 'late', 'absent', 'on_leave', 'half_day'
+    shift_type = db.Column(db.String(20), nullable=False, default='full_day')  # 'full_day', 'second_half'
     late_reason = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -128,6 +129,7 @@ class AttendanceRecord(db.Model):
             'punchOutTime': self.punch_out_time,
             'punchOutPhotoUrl': self.punch_out_photo_url,
             'status': self.status,
+            'shiftType': getattr(self, 'shift_type', 'full_day') or 'full_day',
             'lateReason': self.late_reason
         }
 
@@ -136,12 +138,15 @@ class AttendanceRule(db.Model):
     __tablename__ = 'attendance_rules'
 
     id = db.Column(db.Integer, primary_key=True)
-    ideal_punch_in_time = db.Column(db.String(5), nullable=False, default='09:30')  # HH:MM
+    ideal_punch_in_time = db.Column(db.String(5), nullable=False, default='10:00')  # HH:MM
     ideal_punch_out_time = db.Column(db.String(5), nullable=False, default='18:30')  # HH:MM
     buffer_minutes_in = db.Column(db.Integer, nullable=False, default=15)
     buffer_minutes_out = db.Column(db.Integer, nullable=False, default=15)
     weekly_offs = db.Column(db.String(100), default='Saturday,Sunday')  # Comma separated
     half_day_threshold_in = db.Column(db.String(5), default='12:00')  # Punch after this = half day
+    second_half_start_time = db.Column(db.String(5), nullable=False, default='13:00')  # HH:MM
+    second_half_end_time = db.Column(db.String(5), nullable=False, default='18:30')    # HH:MM
+    second_half_min_punch_out = db.Column(db.String(5), nullable=False, default='18:30') # HH:MM
     effective_from = db.Column(db.String(10), nullable=False, default=datetime.utcnow().strftime('%Y-%m-%d'))
 
     def __init__(self, **kwargs):
@@ -150,13 +155,16 @@ class AttendanceRule(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
-            'idealPunchInTime': self.ideal_punch_in_time,
-            'idealPunchOutTime': self.ideal_punch_out_time,
-            'bufferMinutesIn': self.buffer_minutes_in,
-            'bufferMinutesOut': self.buffer_minutes_out,
-            'weeklyOffs': self.weekly_offs.split(',') if self.weekly_offs else [],
-            'halfDayThresholdIn': self.half_day_threshold_in,
-            'effectiveFrom': self.effective_from
+            'idealPunchInTime': getattr(self, 'ideal_punch_in_time', '10:00') or '10:00',
+            'idealPunchOutTime': getattr(self, 'ideal_punch_out_time', '18:30') or '18:30',
+            'bufferMinutesIn': getattr(self, 'buffer_minutes_in', 15),
+            'bufferMinutesOut': getattr(self, 'buffer_minutes_out', 15),
+            'weeklyOffs': self.weekly_offs.split(',') if getattr(self, 'weekly_offs', None) else [],
+            'halfDayThresholdIn': getattr(self, 'half_day_threshold_in', '12:00') or '12:00',
+            'secondHalfStartTime': getattr(self, 'second_half_start_time', '13:00') or '13:00',
+            'secondHalfEndTime': getattr(self, 'second_half_end_time', '18:30') or '18:30',
+            'secondHalfMinPunchOut': getattr(self, 'second_half_min_punch_out', '18:30') or '18:30',
+            'effectiveFrom': getattr(self, 'effective_from', None)
         }
 
 

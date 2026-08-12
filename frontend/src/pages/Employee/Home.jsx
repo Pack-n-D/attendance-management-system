@@ -17,6 +17,7 @@ export default function Home() {
   const [lateReason, setLateReason] = useState('');
   const [requiresReason, setRequiresReason] = useState(false);
   const [punchType, setPunchType] = useState('in'); // 'in' or 'out'
+  const [shiftType, setShiftType] = useState('full_day'); // 'full_day' or 'second_half'
   const [submitting, setSubmitting] = useState(false);
   const [confirmationMsg, setConfirmationMsg] = useState(null);
 
@@ -182,7 +183,8 @@ export default function Home() {
       const body = {
         photo: capturedPhoto,
         lateReason: lateReason,
-        clientTime: clientTimeStr
+        clientTime: clientTimeStr,
+        shiftType: punchType === 'in' ? shiftType : undefined
       };
 
       const res = await apiFetch(endpoint, {
@@ -922,11 +924,59 @@ export default function Home() {
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
               </div>
 
-              {/* Late Reason Field if punching late */}
-              {(requiresReason || punchType === 'in') && (
-                <div className="apc-form-group" style={{ marginTop: '1rem' }}>
+              {/* Shift Selection Toggle on Punch In */}
+              {punchType === 'in' && (
+                <div style={{ marginTop: '0.85rem', marginBottom: '0.5rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: '0.4rem', color: 'var(--apc-text-primary)' }}>
+                    Select Punch Shift Type:
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShiftType('full_day')}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: 'var(--apc-radius-sm)',
+                        border: shiftType === 'full_day' ? '2px solid var(--apc-primary)' : '1px solid var(--apc-border)',
+                        background: shiftType === 'full_day' ? 'var(--apc-primary-tint)' : 'var(--apc-surface)',
+                        color: shiftType === 'full_day' ? 'var(--apc-primary-dark)' : 'var(--apc-text-primary)',
+                        fontWeight: shiftType === 'full_day' ? 700 : 500,
+                        cursor: 'pointer',
+                        fontSize: '0.82rem',
+                        textAlign: 'center'
+                      }}
+                    >
+                      ☀️ Full Day Shift <br/>
+                      <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>(10:00 AM - 6:30 PM)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShiftType('second_half')}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: 'var(--apc-radius-sm)',
+                        border: shiftType === 'second_half' ? '2px solid #2E9E5B' : '1px solid var(--apc-border)',
+                        background: shiftType === 'second_half' ? 'rgba(46, 158, 91, 0.12)' : 'var(--apc-surface)',
+                        color: shiftType === 'second_half' ? '#1E6B3C' : 'var(--apc-text-primary)',
+                        fontWeight: shiftType === 'second_half' ? 700 : 500,
+                        cursor: 'pointer',
+                        fontSize: '0.82rem',
+                        textAlign: 'center'
+                      }}
+                    >
+                      🌙 Second Half (Half Day) <br/>
+                      <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>(1:00 PM - 6:30 PM)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Late Reason Field if punching late or required */}
+              {(requiresReason || (punchType === 'in' && shiftType === 'full_day')) && (
+                <div className="apc-form-group" style={{ marginTop: '0.75rem' }}>
                   <label htmlFor="lateReason">
-                    Reason for Late Punch-In <span className="required">*</span>
+                    Reason for Late Punch-In {requiresReason && <span className="required">*</span>}
                   </label>
                   <textarea
                     id="lateReason"
@@ -936,7 +986,11 @@ export default function Home() {
                     value={lateReason}
                     onChange={(e) => setLateReason(e.target.value)}
                   />
-                  <p className="apc-helper-text">Required if punching in beyond ideal buffer time.</p>
+                  <p className="apc-helper-text">
+                    {shiftType === 'second_half' 
+                      ? "Punches at 1:00 PM (Second Half) are marked as Half Day without late penalty."
+                      : "Required if punching in beyond ideal buffer time."}
+                  </p>
                 </div>
               )}
 
