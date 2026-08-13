@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
 import AdminSidebar from '../../components/AdminSidebar';
-import { apiFetch, exportAttendanceCSV } from '../../utils/api';
+import { apiFetch, exportAttendanceCSV, getPhotoUrl } from '../../utils/api';
 import { DEPARTMENTS } from '../../utils/constants';
-import { Download, Calendar, Check, X, Clock } from 'lucide-react';
+import { Download, Calendar, Check, X, Clock, Camera, MapPin, Eye } from 'lucide-react';
 
 export default function AttendanceLog() {
   const [activeTab, setActiveTab] = useState('attendance'); // 'attendance' or 'leaves'
@@ -16,6 +16,7 @@ export default function AttendanceLog() {
   const [status, setStatus] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [viewingPhotoRecord, setViewingPhotoRecord] = useState(null);
 
   // Leave Requests state
   const [leaveRequests, setLeaveRequests] = useState([]);
@@ -177,15 +178,17 @@ export default function AttendanceLog() {
                       <th>Department</th>
                       <th>Punch In</th>
                       <th>Punch Out</th>
+                      <th>Location</th>
+                      <th>Punch Photo</th>
                       <th>Status</th>
                       <th>Late Reason</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem' }}>Loading logs...</td></tr>
+                      <tr><td colSpan={10} style={{ textAlign: 'center', padding: '2rem' }}>Loading logs...</td></tr>
                     ) : records.length === 0 ? (
-                      <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--apc-text-secondary)' }}>No records match the filter criteria.</td></tr>
+                      <tr><td colSpan={10} style={{ textAlign: 'center', padding: '2rem', color: 'var(--apc-text-secondary)' }}>No records match the filter criteria.</td></tr>
                     ) : (
                       records.map(r => (
                         <tr key={r.id}>
@@ -195,6 +198,26 @@ export default function AttendanceLog() {
                           <td>{r.department}</td>
                           <td>{r.punchInTime || '—'}</td>
                           <td>{r.punchOutTime || '—'}</td>
+                          <td style={{ fontSize: '0.78rem', color: 'var(--apc-text-primary)' }}>
+                            {r.punchInLocation || r.punchOutLocation ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#1E6B3C', fontWeight: 500 }}>
+                                <MapPin size={13} color="#2E9E5B" /> {r.punchInLocation || r.punchOutLocation}
+                              </span>
+                            ) : '—'}
+                          </td>
+                          <td>
+                            {r.punchInPhotoUrl || r.punchOutPhotoUrl ? (
+                              <button
+                                onClick={() => setViewingPhotoRecord(r)}
+                                className="apc-btn apc-btn-secondary"
+                                style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                              >
+                                <Camera size={13} color="var(--apc-primary-dark)" /> View Photo
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>No Photo</span>
+                            )}
+                          </td>
                           <td><StatusBadge status={r.status} /></td>
                           <td style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)' }}>{r.lateReason || '—'}</td>
                         </tr>
@@ -203,6 +226,90 @@ export default function AttendanceLog() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Punch Verification Photo Modal */}
+              {viewingPhotoRecord && (
+                <div className="apc-modal-overlay">
+                  <div className="apc-modal" style={{ maxWidth: '540px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--apc-border)', paddingBottom: '0.75rem' }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.1rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Camera size={18} color="var(--apc-primary-dark)" />
+                          {viewingPhotoRecord.employeeName}
+                        </h3>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)' }}>
+                          ID: {viewingPhotoRecord.employeeId} · Date: {viewingPhotoRecord.date}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setViewingPhotoRecord(null)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={20} color="var(--apc-text-secondary)" />
+                      </button>
+                    </div>
+
+                    {/* Photos Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: viewingPhotoRecord.punchInPhotoUrl && viewingPhotoRecord.punchOutPhotoUrl ? '1fr 1fr' : '1fr', gap: '1rem' }}>
+                      {viewingPhotoRecord.punchInPhotoUrl && (
+                        <div>
+                          <strong style={{ fontSize: '0.85rem', display: 'block', marginBottom: '0.4rem', color: 'var(--apc-primary-dark)' }}>
+                            ☀️ Punch In Photo ({viewingPhotoRecord.punchInTime || 'N/A'})
+                          </strong>
+                          <div style={{ borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--apc-border)', background: '#1A1612' }}>
+                            <img
+                              src={getPhotoUrl(viewingPhotoRecord.punchInPhotoUrl)}
+                              alt="Punch In Selfie"
+                              style={{ width: '100%', height: '230px', objectFit: 'cover', display: 'block' }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                if (e.target.parentNode) {
+                                  e.target.parentNode.innerHTML = `<div style="padding: 2rem; text-align: center; color: #fff; font-size: 0.8rem;">Photo file path: ${viewingPhotoRecord.punchInPhotoUrl}</div>`;
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {viewingPhotoRecord.punchOutPhotoUrl && (
+                        <div>
+                          <strong style={{ fontSize: '0.85rem', display: 'block', marginBottom: '0.4rem', color: 'var(--apc-primary-dark)' }}>
+                            🌙 Punch Out Photo ({viewingPhotoRecord.punchOutTime || 'N/A'})
+                          </strong>
+                          <div style={{ borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--apc-border)', background: '#1A1612' }}>
+                            <img
+                              src={getPhotoUrl(viewingPhotoRecord.punchOutPhotoUrl)}
+                              alt="Punch Out Selfie"
+                              style={{ width: '100%', height: '230px', objectFit: 'cover', display: 'block' }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                if (e.target.parentNode) {
+                                  e.target.parentNode.innerHTML = `<div style="padding: 2rem; text-align: center; color: #fff; font-size: 0.8rem;">Photo file path: ${viewingPhotoRecord.punchOutPhotoUrl}</div>`;
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Location Footer Info */}
+                    <div style={{ marginTop: '1rem', padding: '0.65rem 0.85rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', fontSize: '0.82rem', border: '1px solid var(--apc-border)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <MapPin size={14} color="#2E9E5B" />
+                        <strong>Verified Location:</strong> {viewingPhotoRecord.punchInLocation || viewingPhotoRecord.punchOutLocation || 'AP Corporation Office, Nashik'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+                      <button onClick={() => setViewingPhotoRecord(null)} className="apc-btn apc-btn-secondary">
+                        Close Preview
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
