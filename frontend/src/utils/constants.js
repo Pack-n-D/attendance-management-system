@@ -19,8 +19,8 @@ export const DEPARTMENTS = [
 
 export const DEFAULT_OFFICE_CONFIG = {
   address: 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002',
-  lat: 20.003972,
-  lng: 73.776836,
+  lat: 20.0024286,
+  lng: 73.776293,
   allowedRadiusMeters: 40.0,
   geofenceEnabled: true
 };
