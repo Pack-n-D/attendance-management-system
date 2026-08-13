@@ -151,9 +151,9 @@ class AttendanceRule(db.Model):
     second_half_min_punch_out = db.Column(db.String(5), nullable=False, default='18:30') # HH:MM
     effective_from = db.Column(db.String(10), nullable=False, default=datetime.utcnow().strftime('%Y-%m-%d'))
     office_address = db.Column(db.Text, nullable=True, default='Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002')
-    office_lat = db.Column(db.Float, nullable=False, default=20.0024286)
-    office_lng = db.Column(db.Float, nullable=False, default=73.776293)
-    allowed_radius_meters = db.Column(db.Float, nullable=False, default=40.0)
+    office_lat = db.Column(db.Float, nullable=False, default=20.0021966)
+    office_lng = db.Column(db.Float, nullable=False, default=73.7762006)
+    allowed_radius_meters = db.Column(db.Float, nullable=False, default=50.0)
     geofence_enabled = db.Column(db.Boolean, nullable=False, default=True)
 
     def __init__(self, **kwargs):
@@ -173,9 +173,9 @@ class AttendanceRule(db.Model):
             'secondHalfMinPunchOut': getattr(self, 'second_half_min_punch_out', '18:30') or '18:30',
             'effectiveFrom': getattr(self, 'effective_from', None),
             'officeAddress': getattr(self, 'office_address', 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002') or 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002',
-            'officeLat': getattr(self, 'office_lat', 20.0024286) if getattr(self, 'office_lat', None) is not None else 20.0024286,
-            'officeLng': getattr(self, 'office_lng', 73.776293) if getattr(self, 'office_lng', None) is not None else 73.776293,
-            'allowedRadiusMeters': getattr(self, 'allowed_radius_meters', 40.0) if getattr(self, 'allowed_radius_meters', None) is not None else 40.0,
+            'officeLat': getattr(self, 'office_lat', 20.0021966) if getattr(self, 'office_lat', None) is not None else 20.0021966,
+            'officeLng': getattr(self, 'office_lng', 73.7762006) if getattr(self, 'office_lng', None) is not None else 73.7762006,
+            'allowedRadiusMeters': getattr(self, 'allowed_radius_meters', 50.0) if getattr(self, 'allowed_radius_meters', None) is not None else 50.0,
             'geofenceEnabled': getattr(self, 'geofence_enabled', True) if getattr(self, 'geofence_enabled', None) is not None else True
         }
 

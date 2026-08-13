@@ -389,9 +389,9 @@ def validate_geofence(user_lat, user_lng, rule):
     if is_enabled is False:
         return True, "Geofence disabled", 0.0
 
-    office_lat = getattr(rule, 'office_lat', 20.0024286) or 20.0024286
-    office_lng = getattr(rule, 'office_lng', 73.776293) or 73.776293
-    allowed_radius = getattr(rule, 'allowed_radius_meters', 40.0) or 40.0
+    office_lat = getattr(rule, 'office_lat', 20.0021966) or 20.0021966
+    office_lng = getattr(rule, 'office_lng', 73.7762006) or 73.7762006
+    allowed_radius = getattr(rule, 'allowed_radius_meters', 50.0) or 50.0
 
     if user_lat is None or user_lng is None:
         return False, "Location access is required. Please turn on location/GPS on your device to punch.", None

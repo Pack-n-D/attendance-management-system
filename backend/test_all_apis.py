@@ -117,16 +117,16 @@ class APCTestSuite(unittest.TestCase):
         res_in = self.client.post('/api/attendance/punch-in', json={
             'photo': 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD',
             'lateReason': 'Traffic delay on main bridge',
-            'latitude': 20.0024286,
-            'longitude': 73.776293
+            'latitude': 20.0021966,
+            'longitude': 73.7762006
         }, headers=self.emp_headers)
         self.assertIn(res_in.status_code, [200, 400])  # 400 if already punched in during seed
 
         # Punch Out with VALID location
         res_out = self.client.post('/api/attendance/punch-out', json={
             'photo': 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD',
-            'latitude': 20.0024286,
-            'longitude': 73.776293
+            'latitude': 20.0021966,
+            'longitude': 73.7762006
         }, headers=self.emp_headers)
         self.assertIn(res_out.status_code, [200, 400])
 
