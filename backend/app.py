@@ -91,7 +91,12 @@ def create_app():
             rule_cols = [
                 ("second_half_start_time", "VARCHAR(5) DEFAULT '13:00'"),
                 ("second_half_end_time", "VARCHAR(5) DEFAULT '18:30'"),
-                ("second_half_min_punch_out", "VARCHAR(5) DEFAULT '18:30'")
+                ("second_half_min_punch_out", "VARCHAR(5) DEFAULT '18:30'"),
+                ("office_address", "TEXT DEFAULT 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002'"),
+                ("office_lat", "FLOAT DEFAULT 20.0024286"),
+                ("office_lng", "FLOAT DEFAULT 73.776293"),
+                ("allowed_radius_meters", "FLOAT DEFAULT 40.0"),
+                ("geofence_enabled", "BOOLEAN DEFAULT TRUE")
             ]
             for col_name, col_type in rule_cols:
                 try:
@@ -101,7 +106,8 @@ def create_app():
                     db.session.rollback()
 
             rec_cols = [
-                ("shift_type", "VARCHAR(20) DEFAULT 'full_day'")
+                ("shift_type", "VARCHAR(20) DEFAULT 'full_day'"),
+                ("punch_out_location", "VARCHAR(255)")
             ]
             for col_name, col_type in rec_cols:
                 try:
