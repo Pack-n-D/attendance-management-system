@@ -3,7 +3,8 @@ import Navbar from '../../components/Navbar';
 import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Clock, Plus, Trash2, Save, Info, KeyRound } from 'lucide-react';
+import { DEFAULT_OFFICE_CONFIG } from '../../utils/constants';
+import { Settings, Clock, Plus, Trash2, Save, Info, KeyRound, MapPin } from 'lucide-react';
 
 export default function AttendanceSettings() {
   const navigate = useNavigate();
@@ -18,6 +19,13 @@ export default function AttendanceSettings() {
   const [secondHalfStartTime, setSecondHalfStartTime] = useState('13:00');
   const [secondHalfEndTime, setSecondHalfEndTime] = useState('18:30');
   const [secondHalfMinPunchOut, setSecondHalfMinPunchOut] = useState('18:30');
+
+  // Office Location & Geofencing Settings
+  const [officeAddress, setOfficeAddress] = useState(DEFAULT_OFFICE_CONFIG.address);
+  const [officeLat, setOfficeLat] = useState(DEFAULT_OFFICE_CONFIG.lat);
+  const [officeLng, setOfficeLng] = useState(DEFAULT_OFFICE_CONFIG.lng);
+  const [allowedRadiusMeters, setAllowedRadiusMeters] = useState(DEFAULT_OFFICE_CONFIG.allowedRadiusMeters);
+  const [geofenceEnabled, setGeofenceEnabled] = useState(DEFAULT_OFFICE_CONFIG.geofenceEnabled);
 
   const [holidays, setHolidays] = useState([]);
   const [newHolidayDate, setNewHolidayDate] = useState('');
@@ -64,6 +72,11 @@ export default function AttendanceSettings() {
         setSecondHalfStartTime(r.secondHalfStartTime || '13:00');
         setSecondHalfEndTime(r.secondHalfEndTime || '18:30');
         setSecondHalfMinPunchOut(r.secondHalfMinPunchOut || '18:30');
+        setOfficeAddress(r.officeAddress || DEFAULT_OFFICE_CONFIG.address);
+        setOfficeLat(r.officeLat ?? DEFAULT_OFFICE_CONFIG.lat);
+        setOfficeLng(r.officeLng ?? DEFAULT_OFFICE_CONFIG.lng);
+        setAllowedRadiusMeters(r.allowedRadiusMeters ?? DEFAULT_OFFICE_CONFIG.allowedRadiusMeters);
+        setGeofenceEnabled(r.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled);
       }
 
       const holRes = await apiFetch('/settings/holidays');
@@ -108,7 +121,12 @@ export default function AttendanceSettings() {
           halfDayThresholdIn,
           secondHalfStartTime,
           secondHalfEndTime,
-          secondHalfMinPunchOut
+          secondHalfMinPunchOut,
+          officeAddress,
+          officeLat,
+          officeLng,
+          allowedRadiusMeters,
+          geofenceEnabled
         })
       });
       setSuccessMsg(res.message);
@@ -318,6 +336,84 @@ export default function AttendanceSettings() {
                     required
                   />
                   <p className="apc-helper-text">Punching out before this time (e.g. 5:00 PM / 5:30 PM) invalidates the half-day shift and converts status to Leave.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Office Location & Geo-Fencing Settings Card */}
+            <div className="apc-card" style={{ marginBottom: '1.5rem', borderLeft: '4px solid #2E9E5B' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--apc-border)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <MapPin size={18} color="#2E9E5B" /> Office Location & Geo-Fencing (40m Radius)
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)', marginBottom: '1.25rem' }}>
+                Restrict employee attendance punches to inside the office premises. Employees punching outside the allowed radius will be blocked.
+              </p>
+
+              <div className="apc-grid-2col" style={{ gap: '1.25rem' }}>
+                <div className="apc-form-group" style={{ gridColumn: 'span 2' }}>
+                  <label htmlFor="offAddr">Office Address / Location Name</label>
+                  <input
+                    id="offAddr"
+                    type="text"
+                    className="apc-input"
+                    value={officeAddress}
+                    onChange={e => setOfficeAddress(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="apc-form-group">
+                  <label htmlFor="offLat">Office Latitude (GPS)</label>
+                  <input
+                    id="offLat"
+                    type="number"
+                    step="0.000001"
+                    className="apc-input"
+                    value={officeLat}
+                    onChange={e => setOfficeLat(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="apc-form-group">
+                  <label htmlFor="offLng">Office Longitude (GPS)</label>
+                  <input
+                    id="offLng"
+                    type="number"
+                    step="0.000001"
+                    className="apc-input"
+                    value={officeLng}
+                    onChange={e => setOfficeLng(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="apc-form-group">
+                  <label htmlFor="offRad">Allowed Radius (Meters)</label>
+                  <input
+                    id="offRad"
+                    type="number"
+                    min="5"
+                    max="1000"
+                    className="apc-input"
+                    value={allowedRadiusMeters}
+                    onChange={e => setAllowedRadiusMeters(e.target.value)}
+                    required
+                  />
+                  <p className="apc-helper-text">Punches within this distance (default 40m) are accepted.</p>
+                </div>
+
+                <div className="apc-form-group" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+                    <input
+                      type="checkbox"
+                      checked={geofenceEnabled}
+                      onChange={e => setGeofenceEnabled(e.target.checked)}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    Enable Strict Location Geo-Fencing
+                  </label>
+                  <p className="apc-helper-text">When checked, system forces GPS location check and blocks remote punches.</p>
                 </div>
               </div>
             </div>

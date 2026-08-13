@@ -107,6 +107,7 @@ class AttendanceRecord(db.Model):
     punch_in_location = db.Column(db.String(255), nullable=True)
     punch_out_time = db.Column(db.String(8), nullable=True)  # HH:MM:SS
     punch_out_photo_url = db.Column(db.String(255), nullable=True)
+    punch_out_location = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), nullable=False)  # 'on_time', 'in_buffer', 'late', 'absent', 'on_leave', 'half_day'
     shift_type = db.Column(db.String(20), nullable=False, default='full_day')  # 'full_day', 'second_half'
     late_reason = db.Column(db.Text, nullable=True)
@@ -128,6 +129,7 @@ class AttendanceRecord(db.Model):
             'punchInLocation': self.punch_in_location,
             'punchOutTime': self.punch_out_time,
             'punchOutPhotoUrl': self.punch_out_photo_url,
+            'punchOutLocation': getattr(self, 'punch_out_location', None),
             'status': self.status,
             'shiftType': getattr(self, 'shift_type', 'full_day') or 'full_day',
             'lateReason': self.late_reason
@@ -148,6 +150,11 @@ class AttendanceRule(db.Model):
     second_half_end_time = db.Column(db.String(5), nullable=False, default='18:30')    # HH:MM
     second_half_min_punch_out = db.Column(db.String(5), nullable=False, default='18:30') # HH:MM
     effective_from = db.Column(db.String(10), nullable=False, default=datetime.utcnow().strftime('%Y-%m-%d'))
+    office_address = db.Column(db.Text, nullable=True, default='Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002')
+    office_lat = db.Column(db.Float, nullable=False, default=20.003972)
+    office_lng = db.Column(db.Float, nullable=False, default=73.776836)
+    allowed_radius_meters = db.Column(db.Float, nullable=False, default=40.0)
+    geofence_enabled = db.Column(db.Boolean, nullable=False, default=True)
 
     def __init__(self, **kwargs):
         super(AttendanceRule, self).__init__(**kwargs)
@@ -164,7 +171,12 @@ class AttendanceRule(db.Model):
             'secondHalfStartTime': getattr(self, 'second_half_start_time', '13:00') or '13:00',
             'secondHalfEndTime': getattr(self, 'second_half_end_time', '18:30') or '18:30',
             'secondHalfMinPunchOut': getattr(self, 'second_half_min_punch_out', '18:30') or '18:30',
-            'effectiveFrom': getattr(self, 'effective_from', None)
+            'effectiveFrom': getattr(self, 'effective_from', None),
+            'officeAddress': getattr(self, 'office_address', 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002') or 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002',
+            'officeLat': getattr(self, 'office_lat', 20.003972) if getattr(self, 'office_lat', None) is not None else 20.003972,
+            'officeLng': getattr(self, 'office_lng', 73.776836) if getattr(self, 'office_lng', None) is not None else 73.776836,
+            'allowedRadiusMeters': getattr(self, 'allowed_radius_meters', 40.0) if getattr(self, 'allowed_radius_meters', None) is not None else 40.0,
+            'geofenceEnabled': getattr(self, 'geofence_enabled', True) if getattr(self, 'geofence_enabled', None) is not None else True
         }
 
 

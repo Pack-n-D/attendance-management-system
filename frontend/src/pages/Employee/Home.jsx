@@ -3,6 +3,7 @@ import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
 import { apiFetch } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
+import { DEFAULT_OFFICE_CONFIG, calculateDistanceMeters } from '../../utils/constants';
 import { Camera, CheckCircle2, Clock, MapPin, AlertTriangle, RefreshCw, Send, Calendar, UserCheck, Check, X, FileText } from 'lucide-react';
 
 export default function Home() {
@@ -20,6 +21,13 @@ export default function Home() {
   const [shiftType, setShiftType] = useState('full_day'); // 'full_day' or 'second_half'
   const [submitting, setSubmitting] = useState(false);
   const [confirmationMsg, setConfirmationMsg] = useState(null);
+
+  // Geolocation & Geofencing state
+  const [userLocation, setUserLocation] = useState({ latitude: null, longitude: null });
+  const [locationStatus, setLocationStatus] = useState('idle'); // 'idle' | 'locating' | 'success' | 'denied' | 'error'
+  const [locationError, setLocationError] = useState('');
+  const [distanceFromOffice, setDistanceFromOffice] = useState(null);
+  const [isOutsideGeofence, setIsOutsideGeofence] = useState(false);
 
   // Leave Management state
   const [showLeaveModal, setShowLeaveModal] = useState(false);
@@ -116,11 +124,61 @@ export default function Home() {
     }
   };
 
+  const fetchUserLocation = (currentRule) => {
+    if (!navigator.geolocation) {
+      setLocationStatus('error');
+      setLocationError('Geolocation is not supported by your device browser.');
+      return;
+    }
+
+    setLocationStatus('locating');
+    setLocationError('');
+    setIsOutsideGeofence(false);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setUserLocation({ latitude: lat, longitude: lng });
+
+        const ruleToUse = currentRule || todayData?.rule;
+        const officeLat = ruleToUse?.officeLat ?? DEFAULT_OFFICE_CONFIG.lat;
+        const officeLng = ruleToUse?.officeLng ?? DEFAULT_OFFICE_CONFIG.lng;
+        const radius = ruleToUse?.allowedRadiusMeters ?? DEFAULT_OFFICE_CONFIG.allowedRadiusMeters;
+        const isGeoEnabled = ruleToUse?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled;
+
+        const dist = calculateDistanceMeters(lat, lng, officeLat, officeLng);
+        const distRounded = Math.round(dist);
+        setDistanceFromOffice(distRounded);
+
+        if (isGeoEnabled && distRounded > radius) {
+          setIsOutsideGeofence(true);
+          setLocationStatus('error');
+          setLocationError(`You are outside the Company area (${distRounded}m from office). Punching is allowed only within ${Math.round(radius)}m radius.`);
+        } else {
+          setIsOutsideGeofence(false);
+          setLocationStatus('success');
+        }
+      },
+      (err) => {
+        console.warn("Geolocation error:", err);
+        setLocationStatus(err.code === 1 ? 'denied' : 'error');
+        if (err.code === 1) {
+          setLocationError("Location access was denied. Please turn on location / GPS on your device to punch.");
+        } else {
+          setLocationError("Unable to acquire high-accuracy GPS location. Please turn on location on your device.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
   const startCamera = async (type) => {
     setPunchType(type);
     setCapturedPhoto(null);
     setShowCameraModal(true);
     setError('');
+    fetchUserLocation(todayData?.rule);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
@@ -173,6 +231,21 @@ export default function Home() {
     setError('');
 
     try {
+      const isGeoEnabled = todayData?.rule?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled;
+      const radiusLimit = Math.round(todayData?.rule?.allowedRadiusMeters || 40);
+
+      if (isGeoEnabled && isOutsideGeofence) {
+        setError(`You are outside the Company area (${distanceFromOffice}m away). Punching is allowed only within ${radiusLimit}m of AP Corporation office.`);
+        setSubmitting(false);
+        return;
+      }
+
+      if (isGeoEnabled && (locationStatus === 'denied' || (locationStatus === 'error' && !userLocation.latitude))) {
+        setError("Location access is required to punch. Please turn on location/GPS on your device and retry.");
+        setSubmitting(false);
+        return;
+      }
+
       const now = new Date();
       const h = String(now.getHours()).padStart(2, '0');
       const m = String(now.getMinutes()).padStart(2, '0');
@@ -184,7 +257,10 @@ export default function Home() {
         photo: capturedPhoto,
         lateReason: lateReason,
         clientTime: clientTimeStr,
-        shiftType: punchType === 'in' ? shiftType : undefined
+        shiftType: punchType === 'in' ? shiftType : undefined,
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        location: distanceFromOffice != null ? `AP Corporation Office, Nashik (${distanceFromOffice}m away)` : undefined
       };
 
       const res = await apiFetch(endpoint, {
@@ -896,6 +972,83 @@ export default function Home() {
                 </div>
               )}
 
+              {/* Geofence Location Status Indicator Banner */}
+              <div
+                style={{
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 'var(--apc-radius-sm)',
+                  fontSize: '0.82rem',
+                  marginBottom: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                  background:
+                    locationStatus === 'success'
+                      ? 'rgba(46, 158, 91, 0.12)'
+                      : locationStatus === 'locating'
+                      ? 'var(--apc-surface)'
+                      : 'rgba(229, 57, 53, 0.12)',
+                  border:
+                    locationStatus === 'success'
+                      ? '1px solid rgba(46, 158, 91, 0.4)'
+                      : locationStatus === 'locating'
+                      ? '1px solid var(--apc-border)'
+                      : '1px solid rgba(229, 57, 53, 0.4)',
+                  color:
+                    locationStatus === 'success'
+                      ? '#1E6B3C'
+                      : locationStatus === 'locating'
+                      ? 'var(--apc-text-primary)'
+                      : '#C62828'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                  {locationStatus === 'locating' && <RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} />}
+                  {locationStatus === 'success' && <MapPin size={16} color="#1E6B3C" />}
+                  {(locationStatus === 'error' || locationStatus === 'denied') && <AlertTriangle size={16} color="#C62828" />}
+                  
+                  <div>
+                    {locationStatus === 'locating' && <strong>Checking device location (GPS)...</strong>}
+                    {locationStatus === 'success' && (
+                      <>
+                        <strong style={{ color: '#1E6B3C' }}>Location Verified: Company Area</strong>
+                        <span style={{ display: 'block', fontSize: '0.76rem', color: '#2E7D32' }}>
+                          AP Corporation Office (Flat 7, Sakar Appt) · <strong>{distanceFromOffice}m</strong> away
+                        </span>
+                      </>
+                    )}
+                    {locationStatus === 'denied' && (
+                      <>
+                        <strong>Location Access Disabled / Denied</strong>
+                        <span style={{ display: 'block', fontSize: '0.76rem', color: '#C62828' }}>
+                          Please turn on Location / GPS on your device to verify company area.
+                        </span>
+                      </>
+                    )}
+                    {locationStatus === 'error' && (
+                      <>
+                        <strong>{isOutsideGeofence ? "Outside Company Area" : "Location Check Failed"}</strong>
+                        <span style={{ display: 'block', fontSize: '0.76rem', color: '#C62828' }}>
+                          {locationError || "Turn on device location to punch attendance."}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {(locationStatus === 'denied' || locationStatus === 'error') && (
+                  <button
+                    type="button"
+                    onClick={() => fetchUserLocation(todayData?.rule)}
+                    className="apc-btn apc-btn-secondary"
+                    style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', flexShrink: 0 }}
+                  >
+                    <RefreshCw size={12} /> Turn On / Retry
+                  </button>
+                )}
+              </div>
+
               {/* Video Stream & Canvas Preview */}
               <div
                 style={{
@@ -1001,7 +1154,14 @@ export default function Home() {
                 </button>
 
                 {!capturedPhoto ? (
-                  <button onClick={capturePhoto} className="apc-btn apc-btn-primary">
+                  <button
+                    onClick={capturePhoto}
+                    className="apc-btn apc-btn-primary"
+                    disabled={
+                      isOutsideGeofence ||
+                      ((todayData?.rule?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled) && locationStatus !== 'success')
+                    }
+                  >
                     <Camera size={16} /> Take Photo
                   </button>
                 ) : (
@@ -1009,7 +1169,15 @@ export default function Home() {
                     <button onClick={() => setCapturedPhoto(null)} className="apc-btn apc-btn-secondary">
                       <RefreshCw size={16} /> Retake
                     </button>
-                    <button onClick={handlePunchSubmit} className="apc-btn apc-btn-primary" disabled={submitting}>
+                    <button
+                      onClick={handlePunchSubmit}
+                      className="apc-btn apc-btn-primary"
+                      disabled={
+                        submitting ||
+                        isOutsideGeofence ||
+                        ((todayData?.rule?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled) && locationStatus !== 'success')
+                      }
+                    >
                       <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Punch'}
                     </button>
                   </>

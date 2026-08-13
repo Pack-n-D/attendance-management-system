@@ -3,6 +3,7 @@ import base64
 import re
 import random
 import string
+import math
 from datetime import datetime, time, timezone, timedelta
 from flask import current_app
 from models import db, Employee, AttendanceRule, AuditLog, Holiday
@@ -354,5 +355,53 @@ def calculate_monthly_salary_slip(employee, month_str: str) -> dict:
         'grossSalary': round(gross_salary, 2),
         'netSalary': round(net_salary, 2)
     }
+
+
+def calculate_haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculates the great-circle distance between two points in meters using Haversine formula.
+    """
+    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+        return float('inf')
+    try:
+        lat1, lon1, lat2, lon2 = float(lat1), float(lon1), float(lat2), float(lon2)
+        R = 6371000.0  # Radius of Earth in meters
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
+
+        a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
+        c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+
+        return R * c
+    except Exception as e:
+        print(f"Error calculating Haversine distance: {e}")
+        return float('inf')
+
+
+def validate_geofence(user_lat, user_lng, rule):
+    """
+    Validates if user coordinates are within rule.allowed_radius_meters of office_lat/office_lng.
+    Returns (is_valid: bool, message: str, distance_meters: float)
+    """
+    is_enabled = getattr(rule, 'geofence_enabled', True)
+    if is_enabled is False:
+        return True, "Geofence disabled", 0.0
+
+    office_lat = getattr(rule, 'office_lat', 20.003972) or 20.003972
+    office_lng = getattr(rule, 'office_lng', 73.776836) or 73.776836
+    allowed_radius = getattr(rule, 'allowed_radius_meters', 40.0) or 40.0
+
+    if user_lat is None or user_lng is None:
+        return False, "Location access is required. Please turn on location/GPS on your device to punch.", None
+
+    distance = calculate_haversine_distance(user_lat, user_lng, office_lat, office_lng)
+    
+    if distance <= allowed_radius:
+        return True, f"Inside office radius ({round(distance, 1)}m)", round(distance, 1)
+    else:
+        return False, f"You are outside the Company area. Current distance is {int(distance)}m from AP Corporation office. Punching is only allowed within {int(allowed_radius)}m radius.", round(distance, 1)
+
 
 

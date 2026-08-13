@@ -99,17 +99,34 @@ class APCTestSuite(unittest.TestCase):
         # Get today status
         res_status = self.client.get('/api/attendance/today-status', headers=self.emp_headers)
         self.assertEqual(res_status.status_code, 200)
+        self.assertIn('officeAddress', res_status.get_json()['rule'])
 
-        # Punch In
+        # Attempt Punch In with OUTSIDE location (Remote/Home punch - 1.5km away)
+        res_outside = self.client.post('/api/attendance/punch-in', json={
+            'photo': 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD',
+            'lateReason': 'Traffic delay',
+            'latitude': 20.010000,
+            'longitude': 73.790000
+        }, headers=self.emp_headers)
+        # Should be rejected with 400 Bad Request because it's outside 40m radius
+        self.assertEqual(res_outside.status_code, 400)
+        self.assertTrue(res_outside.get_json().get('outsideArea', False))
+        self.assertIn('outside the Company area', res_outside.get_json().get('error', ''))
+
+        # Punch In with VALID location (Inside office premises, Sakar Appt)
         res_in = self.client.post('/api/attendance/punch-in', json={
             'photo': 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD',
-            'lateReason': 'Traffic delay on main bridge'
+            'lateReason': 'Traffic delay on main bridge',
+            'latitude': 20.003972,
+            'longitude': 73.776836
         }, headers=self.emp_headers)
         self.assertIn(res_in.status_code, [200, 400])  # 400 if already punched in during seed
 
-        # Punch Out
+        # Punch Out with VALID location
         res_out = self.client.post('/api/attendance/punch-out', json={
-            'photo': 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD'
+            'photo': 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD',
+            'latitude': 20.003972,
+            'longitude': 73.776836
         }, headers=self.emp_headers)
         self.assertIn(res_out.status_code, [200, 400])
 

@@ -4,7 +4,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models import db, Employee, AttendanceRecord, AttendanceRule, Holiday, AuditLog
-from utils import compute_attendance_status, log_audit, get_current_now, get_current_date_str, get_current_time_str
+from utils import compute_attendance_status, log_audit, get_current_now, get_current_date_str, get_current_time_str, validate_geofence
 
 attendance_bp = Blueprint('attendance', __name__, url_prefix='/api/attendance')
 
@@ -66,6 +66,8 @@ def punch_in():
         return jsonify({'error': f'Already punched in today at {existing.punch_in_time}'}), 400
 
     photo_base64 = data.get('photo')
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
     location = data.get('location')
     late_reason = data.get('lateReason', '').strip()
     shift_type = data.get('shiftType', 'full_day')
@@ -76,6 +78,18 @@ def punch_in():
     rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
     if not rule:
         rule = AttendanceRule()
+
+    # Validate Geofence (40m office radius requirement)
+    is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule)
+    if not is_geo_valid:
+        return jsonify({
+            'error': geo_msg,
+            'outsideArea': True,
+            'distance': geo_dist
+        }), 400
+
+    if not location and geo_dist is not None:
+        location = f"AP Corporation Office ({geo_dist}m)"
 
     # Compute status server-side
     status, requires_reason = compute_attendance_status(now_time_str, today_str, rule, shift_type=shift_type)
@@ -133,6 +147,22 @@ def punch_out():
     if not rule:
         rule = AttendanceRule()
 
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    location = data.get('location')
+
+    # Validate Geofence for Punch Out as well
+    is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule)
+    if not is_geo_valid:
+        return jsonify({
+            'error': geo_msg,
+            'outsideArea': True,
+            'distance': geo_dist
+        }), 400
+
+    if not location and geo_dist is not None:
+        location = f"AP Corporation Office ({geo_dist}m)"
+
     record = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
     if not record:
         ideal_in = getattr(rule, 'ideal_punch_in_time', '10:00') + ":00"
@@ -156,6 +186,7 @@ def punch_out():
 
     record.punch_out_time = now_time_str
     record.punch_out_photo_url = photo_url
+    record.punch_out_location = location
 
     # Check Second Half early punch out rule:
     # If punching out before required second half min punch out (e.g. 18:30), mark status as on_leave (unfulfilled half day)
@@ -165,7 +196,6 @@ def punch_out():
         current_out_short = now_time_str[:5] if len(now_time_str) >= 5 else "00:00"
         if current_out_short < min_out:
             record.status = 'on_leave'
-    record.punch_out_photo_url = photo_url
 
     # Check if working on a holiday or weekly off to credit C-Off
     from utils import is_holiday_or_weekly_off

@@ -43,7 +43,12 @@ def update_rules():
         second_half_start_time=data.get('secondHalfStartTime', '13:00'),
         second_half_end_time=data.get('secondHalfEndTime', '18:30'),
         second_half_min_punch_out=data.get('secondHalfMinPunchOut', '18:30'),
-        effective_from=datetime.utcnow().strftime('%Y-%m-%d')
+        effective_from=datetime.utcnow().strftime('%Y-%m-%d'),
+        office_address=data.get('officeAddress', 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002'),
+        office_lat=float(data.get('officeLat', 20.003972)),
+        office_lng=float(data.get('officeLng', 73.776836)),
+        allowed_radius_meters=float(data.get('allowedRadiusMeters', 40.0)),
+        geofence_enabled=bool(data.get('geofenceEnabled', True))
     )
 
     db.session.add(rule)
