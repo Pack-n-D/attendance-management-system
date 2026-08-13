@@ -9,22 +9,25 @@ from utils import compute_attendance_status, log_audit, get_current_now, get_cur
 attendance_bp = Blueprint('attendance', __name__, url_prefix='/api/attendance')
 
 def save_base64_photo(base64_str, folder_name='punches'):
-    """Decodes base64 photo string and saves to uploads folder."""
+    """Decodes base64 photo string, saves to uploads folder, and returns full Data URL for reliable cloud display."""
     if not base64_str:
         return None
     try:
-        if ',' in base64_str:
-            base64_str = base64_str.split(',')[1]
-        image_data = base64.b64decode(base64_str)
+        raw_b64 = base64_str.split(',')[1] if ',' in base64_str else base64_str
+        image_data = base64.b64decode(raw_b64)
         filename = f"{folder_name}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
         filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, 'wb') as f:
             f.write(image_data)
-        return f"/uploads/{filename}"
+        
+        # Return full data URL so image works 100% reliably across Railway container restarts and CORS
+        if base64_str.startswith('data:'):
+            return base64_str
+        return f"data:image/jpeg;base64,{raw_b64}"
     except Exception as e:
         print(f"Error saving photo: {e}")
-        return None
+        return base64_str if (base64_str and base64_str.startswith('data:')) else None
 
 
 @attendance_bp.route('/today-status', methods=['GET'])

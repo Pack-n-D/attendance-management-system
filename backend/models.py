@@ -103,10 +103,10 @@ class AttendanceRecord(db.Model):
     employee_id = db.Column(db.String(20), db.ForeignKey('employees.id'), nullable=False)
     date = db.Column(db.String(10), nullable=False)  # YYYY-MM-DD
     punch_in_time = db.Column(db.String(8), nullable=True)  # HH:MM:SS
-    punch_in_photo_url = db.Column(db.String(255), nullable=True)
+    punch_in_photo_url = db.Column(db.Text, nullable=True)
     punch_in_location = db.Column(db.String(255), nullable=True)
     punch_out_time = db.Column(db.String(8), nullable=True)  # HH:MM:SS
-    punch_out_photo_url = db.Column(db.String(255), nullable=True)
+    punch_out_photo_url = db.Column(db.Text, nullable=True)
     punch_out_location = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), nullable=False)  # 'on_time', 'in_buffer', 'late', 'absent', 'on_leave', 'half_day'
     shift_type = db.Column(db.String(20), nullable=False, default='full_day')  # 'full_day', 'second_half'

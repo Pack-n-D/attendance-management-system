@@ -47,6 +47,8 @@ def create_app():
             # Automatic non-destructive schema migration for columns across PostgreSQL & SQLite
             try:
                 db.session.execute(db.text("ALTER TABLE employees ALTER COLUMN profile_photo_url TYPE TEXT;"))
+                db.session.execute(db.text("ALTER TABLE attendance_records ALTER COLUMN punch_in_photo_url TYPE TEXT;"))
+                db.session.execute(db.text("ALTER TABLE attendance_records ALTER COLUMN punch_out_photo_url TYPE TEXT;"))
                 db.session.commit()
             except Exception:
                 db.session.rollback()
@@ -225,8 +227,11 @@ def create_app():
 
     # Serve static uploaded files
     @app.route('/uploads/<path:filename>')
+    @app.route('/api/uploads/<path:filename>')
     def uploaded_file(filename):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        response = send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
 
     @app.route('/', methods=['GET'])
     def root_info():

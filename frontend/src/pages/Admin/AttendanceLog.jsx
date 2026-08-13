@@ -263,8 +263,9 @@ export default function AttendanceLog() {
                               style={{ width: '100%', height: '230px', objectFit: 'cover', display: 'block' }}
                               onError={(e) => {
                                 e.target.style.display = 'none';
-                                if (e.target.parentNode) {
-                                  e.target.parentNode.innerHTML = `<div style="padding: 2rem; text-align: center; color: #fff; font-size: 0.8rem;">Photo file path: ${viewingPhotoRecord.punchInPhotoUrl}</div>`;
+                                if (e.target.parentNode && !e.target.parentNode.dataset.errorHandled) {
+                                  e.target.parentNode.dataset.errorHandled = "true";
+                                  e.target.parentNode.innerHTML = `<div style="padding: 2rem 1rem; text-align: center; color: #E53935; font-size: 0.82rem; background: #2B2620;">⚠️ Previous Server File Missing<br/><span style="font-size:0.75rem; color:#aaa; display:block; margin-top:4px;">Punches moving forward save full high-res photo data. Path: ${viewingPhotoRecord.punchInPhotoUrl}</span></div>`;
                                 }
                               }}
                             />
@@ -284,8 +285,9 @@ export default function AttendanceLog() {
                               style={{ width: '100%', height: '230px', objectFit: 'cover', display: 'block' }}
                               onError={(e) => {
                                 e.target.style.display = 'none';
-                                if (e.target.parentNode) {
-                                  e.target.parentNode.innerHTML = `<div style="padding: 2rem; text-align: center; color: #fff; font-size: 0.8rem;">Photo file path: ${viewingPhotoRecord.punchOutPhotoUrl}</div>`;
+                                if (e.target.parentNode && !e.target.parentNode.dataset.errorHandled) {
+                                  e.target.parentNode.dataset.errorHandled = "true";
+                                  e.target.parentNode.innerHTML = `<div style="padding: 2rem 1rem; text-align: center; color: #E53935; font-size: 0.82rem; background: #2B2620;">⚠️ Previous Server File Missing<br/><span style="font-size:0.75rem; color:#aaa; display:block; margin-top:4px;">Punches moving forward save full high-res photo data. Path: ${viewingPhotoRecord.punchOutPhotoUrl}</span></div>`;
                                 }
                               }}
                             />
