@@ -139,7 +139,8 @@ export default function Home() {
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        setUserLocation({ latitude: lat, longitude: lng });
+        const accuracy = Math.round(pos.coords.accuracy || 0);
+        setUserLocation({ latitude: lat, longitude: lng, accuracy });
 
         const ruleToUse = currentRule || todayData?.rule;
         const officeLat = ruleToUse?.officeLat ?? DEFAULT_OFFICE_CONFIG.lat;
@@ -147,11 +148,15 @@ export default function Home() {
         const radius = ruleToUse?.allowedRadiusMeters ?? DEFAULT_OFFICE_CONFIG.allowedRadiusMeters;
         const isGeoEnabled = ruleToUse?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled;
 
-        const dist = calculateDistanceMeters(lat, lng, officeLat, officeLng);
-        const distRounded = Math.round(dist);
+        const rawDist = calculateDistanceMeters(lat, lng, officeLat, officeLng);
+        
+        // Deduct indoor mobile GPS accuracy buffer (up to 40m tolerance)
+        const accuracyDeduction = Math.min(accuracy, 40);
+        const effectiveDist = Math.max(0, rawDist - accuracyDeduction);
+        const distRounded = Math.round(rawDist);
         setDistanceFromOffice(distRounded);
 
-        if (isGeoEnabled && distRounded > radius) {
+        if (isGeoEnabled && effectiveDist > radius) {
           setIsOutsideGeofence(true);
           setLocationStatus('error');
           setLocationError(`You are outside the Company area (${distRounded}m from office). Punching is allowed only within ${Math.round(radius)}m radius.`);
@@ -260,6 +265,7 @@ export default function Home() {
         shiftType: punchType === 'in' ? shiftType : undefined,
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
+        accuracy: userLocation.accuracy,
         location: distanceFromOffice != null ? `AP Corporation Office, Nashik (${distanceFromOffice}m away)` : undefined
       };
 
@@ -515,17 +521,29 @@ export default function Home() {
           {!isPunchedOut && (
             <div style={{ marginTop: '1.25rem' }}>
               {!isPunchedIn ? (
-                <button
-                  onClick={() => startCamera('in')}
-                  className="apc-btn apc-btn-primary apc-btn-lg apc-btn-block"
-                  style={{
-                    padding: '1.1rem',
-                    fontSize: '1.15rem',
-                    boxShadow: '0 4px 14px rgba(245, 166, 35, 0.45)'
-                  }}
-                >
-                  <Camera size={24} /> PUNCH IN NOW
-                </button>
+                <div>
+                  <button
+                    onClick={() => startCamera('in')}
+                    className="apc-btn apc-btn-primary apc-btn-lg apc-btn-block"
+                    style={{
+                      padding: '1.1rem',
+                      fontSize: '1.15rem',
+                      boxShadow: '0 4px 14px rgba(245, 166, 35, 0.45)'
+                    }}
+                  >
+                    <Camera size={24} /> PUNCH IN NOW
+                  </button>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => startCamera('out')}
+                      className="apc-btn apc-btn-secondary apc-btn-sm"
+                      style={{ fontSize: '0.82rem', color: 'var(--apc-text-secondary)' }}
+                    >
+                      <Clock size={14} /> Already Punched In? Click to Punch Out
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <button
                   onClick={() => startCamera('out')}
@@ -1009,13 +1027,18 @@ export default function Home() {
                   {(locationStatus === 'error' || locationStatus === 'denied') && <AlertTriangle size={16} color="#C62828" />}
                   
                   <div>
-                    {locationStatus === 'locating' && <strong>Checking device location (GPS)...</strong>}
+                    {locationStatus === 'locating' && <strong>Acquiring High-Precision GPS Lock...</strong>}
                     {locationStatus === 'success' && (
                       <>
                         <strong style={{ color: '#1E6B3C' }}>Location Verified: Company Area</strong>
                         <span style={{ display: 'block', fontSize: '0.76rem', color: '#2E7D32' }}>
-                          AP Corporation Office (Flat 7, Sakar Appt) · <strong>{distanceFromOffice}m</strong> away
+                          AP Corporation Office · <strong>{distanceFromOffice}m</strong> away {userLocation?.accuracy ? `(±${userLocation.accuracy}m GPS precision)` : ''}
                         </span>
+                        {userLocation?.latitude && (
+                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#4CAF50', fontFamily: 'monospace' }}>
+                            GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
+                          </span>
+                        )}
                       </>
                     )}
                     {locationStatus === 'denied' && (
@@ -1032,6 +1055,11 @@ export default function Home() {
                         <span style={{ display: 'block', fontSize: '0.76rem', color: '#C62828' }}>
                           {locationError || "Turn on device location to punch attendance."}
                         </span>
+                        {userLocation?.latitude && (
+                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#E53935', fontFamily: 'monospace', marginTop: '2px' }}>
+                            Live GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)} {userLocation?.accuracy ? `(±${userLocation.accuracy}m precision)` : ''}
+                          </span>
+                        )}
                       </>
                     )}
                   </div>

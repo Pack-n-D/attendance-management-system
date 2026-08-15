@@ -34,17 +34,23 @@ def save_base64_photo(base64_str, folder_name='punches'):
 @jwt_required()
 def get_today_status():
     user_id = get_jwt_identity()
-    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    today_str = get_current_date_str()
+    now_time_str = get_current_time_str()
     
     rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
     if not rule:
         rule = AttendanceRule()
 
     record = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
+    if not record:
+        # Fallback check for UTC date if different
+        utc_date = datetime.utcnow().strftime('%Y-%m-%d')
+        if utc_date != today_str:
+            record = AttendanceRecord.query.filter_by(employee_id=user_id, date=utc_date).first()
     
     return jsonify({
         'todayDate': today_str,
-        'currentTime': datetime.utcnow().strftime('%H:%M:%S'),
+        'currentTime': now_time_str,
         'rule': rule.to_dict(),
         'record': record.to_dict() if record else None
     }), 200
@@ -71,6 +77,7 @@ def punch_in():
     photo_base64 = data.get('photo')
     latitude = data.get('latitude')
     longitude = data.get('longitude')
+    accuracy = data.get('accuracy')
     location = data.get('location')
     late_reason = data.get('lateReason', '').strip()
     shift_type = data.get('shiftType', 'full_day')
@@ -82,8 +89,8 @@ def punch_in():
     if not rule:
         rule = AttendanceRule()
 
-    # Validate Geofence (40m office radius requirement)
-    is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule)
+    # Validate Geofence (office radius requirement with mobile accuracy buffer)
+    is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule, user_accuracy=accuracy)
     if not is_geo_valid:
         return jsonify({
             'error': geo_msg,
@@ -152,10 +159,11 @@ def punch_out():
 
     latitude = data.get('latitude')
     longitude = data.get('longitude')
+    accuracy = data.get('accuracy')
     location = data.get('location')
 
     # Validate Geofence for Punch Out as well
-    is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule)
+    is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule, user_accuracy=accuracy)
     if not is_geo_valid:
         return jsonify({
             'error': geo_msg,
@@ -200,6 +208,31 @@ def punch_out():
         if current_out_short < min_out:
             record.status = 'on_leave'
 
+    # Calculate worked duration and overtime hours
+    overtime_msg = ""
+    try:
+        if record.punch_in_time and record.punch_out_time:
+            in_fmt = '%H:%M:%S' if len(record.punch_in_time) == 8 else '%H:%M'
+            out_fmt = '%H:%M:%S' if len(now_time_str) == 8 else '%H:%M'
+            t1 = datetime.strptime(record.punch_in_time, in_fmt)
+            t2 = datetime.strptime(now_time_str, out_fmt)
+            worked_seconds = (t2 - t1).seconds
+            worked_hours = round(worked_seconds / 3600.0, 2)
+
+            ideal_in_str = getattr(rule, 'ideal_punch_in_time', '09:30') or '09:30'
+            ideal_out_str = getattr(rule, 'ideal_punch_out_time', '18:30') or '18:30'
+            t_ideal_in = datetime.strptime(ideal_in_str, '%H:%M')
+            t_ideal_out = datetime.strptime(ideal_out_str, '%H:%M')
+            ideal_shift_hours = (t_ideal_out - t_ideal_in).seconds / 3600.0
+
+            if worked_hours > ideal_shift_hours:
+                ot_hrs = round(worked_hours - ideal_shift_hours, 2)
+                overtime_msg = f" ⏱️ Overtime Recorded: {ot_hrs} hrs extra worked (Total: {worked_hours} hrs)."
+            else:
+                overtime_msg = f" (Total worked: {worked_hours} hrs)."
+    except Exception as ot_err:
+        print(f"Overtime calculation notice: {ot_err}")
+
     # Check if working on a holiday or weekly off to credit C-Off
     from utils import is_holiday_or_weekly_off
     is_off, reason = is_holiday_or_weekly_off(today_str)
@@ -214,7 +247,7 @@ def punch_out():
     db.session.commit()
 
     return jsonify({
-        'message': f"Punched out successfully at {now_time_str}.{coff_msg}",
+        'message': f"Punched out successfully at {now_time_str}.{overtime_msg}{coff_msg}",
         'recordedTime': now_time_str,
         'record': record.to_dict()
     }), 200

@@ -47,7 +47,7 @@ def update_rules():
         office_address=data.get('officeAddress', 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002'),
         office_lat=float(data.get('officeLat', 20.003972)),
         office_lng=float(data.get('officeLng', 73.776836)),
-        allowed_radius_meters=float(data.get('allowedRadiusMeters', 40.0)),
+        allowed_radius_meters=float(data.get('allowedRadiusMeters', 120.0)),
         geofence_enabled=bool(data.get('geofenceEnabled', True))
     )
 

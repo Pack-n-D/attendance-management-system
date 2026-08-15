@@ -21,7 +21,7 @@ export const DEFAULT_OFFICE_CONFIG = {
   address: 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002',
   lat: 20.0021966,
   lng: 73.7762006,
-  allowedRadiusMeters: 50.0,
+  allowedRadiusMeters: 120.0,
   geofenceEnabled: true
 };
 

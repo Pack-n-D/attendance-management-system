@@ -97,7 +97,7 @@ def create_app():
                 ("office_address", "TEXT DEFAULT 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002'"),
                 ("office_lat", "FLOAT DEFAULT 20.0021966"),
                 ("office_lng", "FLOAT DEFAULT 73.7762006"),
-                ("allowed_radius_meters", "FLOAT DEFAULT 50.0"),
+                ("allowed_radius_meters", "FLOAT DEFAULT 120.0"),
                 ("geofence_enabled", "BOOLEAN DEFAULT TRUE")
             ]
             for col_name, col_type in rule_cols:
@@ -121,13 +121,13 @@ def create_app():
             from models import Employee, AttendanceRule
             from werkzeug.security import generate_password_hash
 
-            # Ensure existing AttendanceRule is updated with newest office coordinates & 50m radius
+            # Ensure existing AttendanceRule is updated with newest office coordinates & 120m radius
             try:
                 latest_rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
                 if latest_rule:
                     latest_rule.office_lat = 20.0021966
                     latest_rule.office_lng = 73.7762006
-                    latest_rule.allowed_radius_meters = 50.0
+                    latest_rule.allowed_radius_meters = 120.0
                     db.session.commit()
             except Exception:
                 db.session.rollback()

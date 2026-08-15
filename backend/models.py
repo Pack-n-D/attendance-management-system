@@ -153,7 +153,7 @@ class AttendanceRule(db.Model):
     office_address = db.Column(db.Text, nullable=True, default='Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002')
     office_lat = db.Column(db.Float, nullable=False, default=20.0021966)
     office_lng = db.Column(db.Float, nullable=False, default=73.7762006)
-    allowed_radius_meters = db.Column(db.Float, nullable=False, default=50.0)
+    allowed_radius_meters = db.Column(db.Float, nullable=False, default=120.0)
     geofence_enabled = db.Column(db.Boolean, nullable=False, default=True)
 
     def __init__(self, **kwargs):
@@ -175,7 +175,7 @@ class AttendanceRule(db.Model):
             'officeAddress': getattr(self, 'office_address', 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002') or 'Flat no.7 Sakar Appartment Pandit Colony Lane, 7, Gangapur Rd, Nashik, Maharashtra 422002',
             'officeLat': getattr(self, 'office_lat', 20.0021966) if getattr(self, 'office_lat', None) is not None else 20.0021966,
             'officeLng': getattr(self, 'office_lng', 73.7762006) if getattr(self, 'office_lng', None) is not None else 73.7762006,
-            'allowedRadiusMeters': getattr(self, 'allowed_radius_meters', 50.0) if getattr(self, 'allowed_radius_meters', None) is not None else 50.0,
+            'allowedRadiusMeters': getattr(self, 'allowed_radius_meters', 120.0) if getattr(self, 'allowed_radius_meters', None) is not None else 120.0,
             'geofenceEnabled': getattr(self, 'geofence_enabled', True) if getattr(self, 'geofence_enabled', None) is not None else True
         }
 

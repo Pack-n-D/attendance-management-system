@@ -28,7 +28,7 @@ def check_admin_access():
 # --- DASHBOARD ---
 @admin_bp.route('/dashboard', methods=['GET'])
 def get_dashboard_stats():
-    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    today_str = get_current_date_str()
     
     total_employees = Employee.query.filter_by(status='active', role='employee').count()
     
@@ -139,7 +139,7 @@ def get_employees():
     employees = query.order_by(Employee.created_at.desc()).all()
     
     # Attach today's attendance status to each employee
-    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    today_str = get_current_date_str()
     result = []
     for emp in employees:
         emp_dict = emp.to_dict()

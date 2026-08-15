@@ -380,9 +380,10 @@ def calculate_haversine_distance(lat1, lon1, lat2, lon2):
         return float('inf')
 
 
-def validate_geofence(user_lat, user_lng, rule):
+def validate_geofence(user_lat, user_lng, rule, user_accuracy=None):
     """
     Validates if user coordinates are within rule.allowed_radius_meters of office_lat/office_lng.
+    Deducts mobile indoor GPS accuracy margin (up to 40m tolerance).
     Returns (is_valid: bool, message: str, distance_meters: float)
     """
     is_enabled = getattr(rule, 'geofence_enabled', True)
@@ -391,14 +392,25 @@ def validate_geofence(user_lat, user_lng, rule):
 
     office_lat = getattr(rule, 'office_lat', 20.0021966) or 20.0021966
     office_lng = getattr(rule, 'office_lng', 73.7762006) or 73.7762006
-    allowed_radius = getattr(rule, 'allowed_radius_meters', 50.0) or 50.0
+    allowed_radius = getattr(rule, 'allowed_radius_meters', 120.0) or 120.0
 
     if user_lat is None or user_lng is None:
         return False, "Location access is required. Please turn on location/GPS on your device to punch.", None
 
     distance = calculate_haversine_distance(user_lat, user_lng, office_lat, office_lng)
     
-    if distance <= allowed_radius:
+    # Deduct indoor mobile GPS accuracy buffer (up to 40m tolerance)
+    accuracy_buffer = 0.0
+    if user_accuracy is not None:
+        try:
+            acc_val = float(user_accuracy)
+            accuracy_buffer = min(acc_val, 40.0)
+        except Exception:
+            accuracy_buffer = 0.0
+
+    effective_distance = max(0.0, distance - accuracy_buffer)
+
+    if effective_distance <= allowed_radius:
         return True, f"Inside office radius ({round(distance, 1)}m)", round(distance, 1)
     else:
         return False, f"You are outside the Company area. Current distance is {int(distance)}m from AP Corporation office. Punching is only allowed within {int(allowed_radius)}m radius.", round(distance, 1)
