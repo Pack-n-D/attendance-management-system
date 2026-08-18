@@ -1,18 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Logo from '../../components/Logo';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { LogIn, KeyRound, AlertCircle, Sparkles } from 'lucide-react';
+import { LogIn, AlertCircle, CheckSquare, Square } from 'lucide-react';
 
 export default function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
-  const { login, loading } = useAuth();
+  const { login, loading, user, token } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const isExpired = searchParams.get('expired') === '1';
+
+  // 1. Auto-redirect if already logged in
+  useEffect(() => {
+    if (token && user && !isExpired) {
+      if (user.mustChangePassword) {
+        navigate('/profile/change-password?forced=1', { replace: true });
+      } else if (user.role === 'super_admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/home', { replace: true });
+      }
+    }
+  }, [token, user, isExpired, navigate]);
+
+  // 2. Load saved credentials on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('apc_saved_credentials');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.identifier) setIdentifier(parsed.identifier);
+        if (parsed.password) setPassword(parsed.password);
+        setRememberMe(true);
+      }
+    } catch (e) {
+      console.warn('Failed to load saved credentials', e);
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,6 +52,17 @@ export default function Login() {
       if (!loggedInUser) {
         throw new Error('Login failed. Please check your credentials.');
       }
+
+      // Save or clear credentials based on Remember Me choice
+      if (rememberMe) {
+        localStorage.setItem(
+          'apc_saved_credentials',
+          JSON.stringify({ identifier, password })
+        );
+      } else {
+        localStorage.removeItem('apc_saved_credentials');
+      }
+
       if (loggedInUser.mustChangePassword) {
         navigate('/profile/change-password?forced=1');
       } else if (loggedInUser.role === 'super_admin') {
@@ -33,16 +73,6 @@ export default function Login() {
     } catch (err) {
       setError(err.message || 'Login failed. Please check credentials.');
     }
-  };
-
-  const handleFillDemoAdmin = () => {
-    setIdentifier('SUPERADMIN01');
-    setPassword('Admin@123');
-  };
-
-  const handleFillDemoEmployee = () => {
-    setIdentifier('karan@apc.com');
-    setPassword('Password@123');
   };
 
   return (
@@ -108,16 +138,18 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="on">
           <div className="apc-form-group">
             <label htmlFor="identifier">Employee ID or Email</label>
             <input
               id="identifier"
+              name="username"
               type="text"
               className="apc-input"
-              placeholder="e.g. JO-DO-99-0001 or admin@apc.com"
+              placeholder="e.g. JO-DO-99-0001 or employee@apc.com"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
+              autoComplete="username"
               required
             />
           </div>
@@ -126,19 +158,79 @@ export default function Login() {
             <label htmlFor="password">Password</label>
             <input
               id="password"
+              name="password"
               type="password"
               className="apc-input"
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               required
             />
+          </div>
+
+          {/* Remember Credentials Option */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: '0.75rem',
+              marginBottom: '1rem',
+              userSelect: 'none'
+            }}
+          >
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.86rem',
+                color: 'var(--apc-text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  accentColor: 'var(--apc-primary)',
+                  cursor: 'pointer'
+                }}
+              />
+              Remember credentials on this device
+            </label>
+
+            {identifier && password && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIdentifier('');
+                  setPassword('');
+                  localStorage.removeItem('apc_saved_credentials');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--apc-text-muted)',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  padding: 0,
+                  textDecoration: 'underline'
+                }}
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           <button
             type="submit"
             className="apc-btn apc-btn-primary apc-btn-block apc-btn-lg"
-            style={{ marginTop: '1.25rem' }}
+            style={{ marginTop: '0.5rem' }}
             disabled={loading}
           >
             <LogIn size={18} /> {loading ? 'Signing in...' : 'Sign In'}
