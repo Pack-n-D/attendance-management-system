@@ -111,49 +111,46 @@ def compute_attendance_status(punch_in_time_str: str, date_str: str, rule: Atten
         in_hour, in_minute, *rest = map(int, punch_in_time_str.split(':'))
         punch_time = time(in_hour, in_minute)
         
-        # Second Half shift calculation
-        if shift_type == 'second_half':
-            second_start = getattr(rule, 'second_half_start_time', '13:00') or '13:00'
-            sh_h, sh_m = map(int, second_start.split(':'))
-            
-            # Buffer for second half punch in
-            total_sh_minutes = sh_h * 60 + sh_m
-            buf = getattr(rule, 'buffer_minutes_in', 15) or 15
-            sh_buffer_end_minutes = total_sh_minutes + buf
-            sh_buffer_end_h = sh_buffer_end_minutes // 60
-            sh_buffer_end_m = sh_buffer_end_minutes % 60
-            sh_buffer_end_time = time(sh_buffer_end_h % 24, sh_buffer_end_m)
-            
-            if punch_time <= sh_buffer_end_time:
-                # Punching in around 1:00 PM for second half is NOT marked late, it is half_day without requiring late reason
-                return 'half_day', False
-            else:
-                # Punching in after 1:00 PM buffer requires a late reason
-                return 'half_day', True
-
-        # Full Day shift calculation
+        # 1. Ideal punch in & buffer calculation (Full Day)
         ideal_in = getattr(rule, 'ideal_punch_in_time', '10:00') or '10:00'
         ideal_h, ideal_m = map(int, ideal_in.split(':'))
         ideal_time = time(ideal_h, ideal_m)
         
-        # Buffer end time
         buf = getattr(rule, 'buffer_minutes_in', 15) or 15
         total_ideal_minutes = ideal_h * 60 + ideal_m
         buffer_end_minutes = total_ideal_minutes + buf
         buffer_end_h = buffer_end_minutes // 60
         buffer_end_m = buffer_end_minutes % 60
         buffer_end_time = time(buffer_end_h % 24, buffer_end_m)
-        
-        # Half day threshold for full day punch-in
-        half_in = getattr(rule, 'half_day_threshold_in', '12:00') or '12:00'
-        half_h, half_m = map(int, half_in.split(':'))
-        half_day_time = time(half_h, half_m)
-        
+
+        # 2. Morning punches before or at ideal/buffer time are ALWAYS Full Day On Time / In Buffer
         if punch_time <= ideal_time:
             return 'on_time', False
         elif punch_time <= buffer_end_time:
             return 'in_buffer', False
-        elif punch_time <= half_day_time:
+
+        # 3. Second Half Shift (Applicable for afternoon punch-in, e.g. 12:00 PM onwards)
+        second_start = getattr(rule, 'second_half_start_time', '13:00') or '13:00'
+        sh_h, sh_m = map(int, second_start.split(':'))
+        
+        total_sh_minutes = sh_h * 60 + sh_m
+        sh_buffer_end_minutes = total_sh_minutes + buf
+        sh_buffer_end_h = sh_buffer_end_minutes // 60
+        sh_buffer_end_m = sh_buffer_end_minutes % 60
+        sh_buffer_end_time = time(sh_buffer_end_h % 24, sh_buffer_end_m)
+
+        if shift_type == 'second_half' and punch_time >= time(12, 0):
+            if punch_time <= sh_buffer_end_time:
+                return 'half_day', False
+            else:
+                return 'half_day', True
+
+        # 4. Full Day Shift after buffer time
+        half_in = getattr(rule, 'half_day_threshold_in', '12:00') or '12:00'
+        half_h, half_m = map(int, half_in.split(':'))
+        half_day_time = time(half_h, half_m)
+
+        if punch_time <= half_day_time:
             return 'late', True
         else:
             return 'half_day', True

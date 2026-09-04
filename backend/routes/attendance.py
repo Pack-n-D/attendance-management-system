@@ -84,6 +84,14 @@ def punch_in():
     if shift_type not in ['full_day', 'second_half']:
         shift_type = 'full_day'
 
+    # Any morning punch before 12:00 PM is always a Full Day punch
+    try:
+        in_hour = int(now_time_str.split(':')[0])
+        if in_hour < 12:
+            shift_type = 'full_day'
+    except Exception:
+        pass
+
     # Get current active rule
     rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
     if not rule:

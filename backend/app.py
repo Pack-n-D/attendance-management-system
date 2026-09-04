@@ -132,6 +132,14 @@ def create_app():
             except Exception:
                 db.session.rollback()
 
+            # Auto-correct any morning punches that were erroneously set to 'half_day'
+            try:
+                db.session.execute(db.text("UPDATE attendance_records SET status = 'on_time', shift_type = 'full_day' WHERE punch_in_time <= '10:00:59' AND status = 'half_day';"))
+                db.session.execute(db.text("UPDATE attendance_records SET status = 'in_buffer', shift_type = 'full_day' WHERE punch_in_time > '10:00:59' AND punch_in_time <= '10:15:59' AND status = 'half_day';"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
             # Guarantee Super Admin exists and password hash is set to Admin@123
             admin = Employee.query.filter((Employee.id == 'SUPERADMIN01') | (Employee.email == 'admin@apc.com')).first()
             if not admin:

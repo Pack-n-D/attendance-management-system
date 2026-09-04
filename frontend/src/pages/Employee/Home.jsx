@@ -181,6 +181,13 @@ export default function Home() {
   const startCamera = async (type) => {
     setPunchType(type);
     setCapturedPhoto(null);
+    setLateReason('');
+    setRequiresReason(false);
+    
+    // Auto-default shift type: morning is Full Day, afternoon is Second Half
+    const nowHour = new Date().getHours();
+    setShiftType(nowHour >= 12 ? 'second_half' : 'full_day');
+    
     setShowCameraModal(true);
     setError('');
     fetchUserLocation(todayData?.rule);
@@ -1153,24 +1160,22 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Late Reason Field if punching late or required */}
-              {(requiresReason || (punchType === 'in' && shiftType === 'full_day')) && (
+              {/* Late Reason Field only when actually required by system */}
+              {requiresReason && (
                 <div className="apc-form-group" style={{ marginTop: '0.75rem' }}>
-                  <label htmlFor="lateReason">
-                    Reason for Late Punch-In {requiresReason && <span className="required">*</span>}
+                  <label htmlFor="lateReason" style={{ color: '#D97706', fontWeight: 600 }}>
+                    Reason for Late Punch-In <span className="required">*</span>
                   </label>
                   <textarea
                     id="lateReason"
-                    className={`apc-textarea ${requiresReason && !lateReason ? 'invalid' : ''}`}
+                    className={`apc-textarea ${!lateReason ? 'invalid' : ''}`}
                     rows={2}
-                    placeholder="Briefly state reason (e.g. client meeting, traffic delay)..."
+                    placeholder="Briefly state reason for late arrival (e.g. client visit, traffic delay)..."
                     value={lateReason}
                     onChange={(e) => setLateReason(e.target.value)}
                   />
-                  <p className="apc-helper-text">
-                    {shiftType === 'second_half' 
-                      ? "Punches at 1:00 PM (Second Half) are marked as Half Day without late penalty."
-                      : "Required if punching in beyond ideal buffer time."}
+                  <p className="apc-helper-text" style={{ color: '#D97706' }}>
+                    Your punch-in is past the shift buffer time. Please provide a brief reason to complete punch-in.
                   </p>
                 </div>
               )}

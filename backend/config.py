@@ -7,8 +7,8 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'apc-attendance-super-secret-key-2026')
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'apc-jwt-secret-key-production-ready')
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=8)
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=3650)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=3650)
     JWT_TOKEN_LOCATION = ['headers', 'query_string']
     JWT_QUERY_STRING_NAME = 'token'
     

@@ -33,7 +33,6 @@ def login():
         if not check_password_hash(employee.password_hash, password):
             return jsonify({'error': 'Invalid credentials. Incorrect password.'}), 401
 
-        # Create tokens with claims
         additional_claims = {
             'role': employee.role,
             'mustChangePassword': employee.must_change_password,

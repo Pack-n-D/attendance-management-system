@@ -662,12 +662,43 @@ def get_audit_logs():
     return jsonify({'auditLogs': [l.to_dict() for l in logs]}), 200
 
 
+@admin_bp.route('/attendance-records/<int:rec_id>', methods=['PUT'])
+def update_attendance_record(rec_id):
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    if not admin_user or admin_user.role != 'super_admin':
+        return jsonify({'error': 'Unauthorized. Super Admin role required.'}), 403
+
+    record = AttendanceRecord.query.get(rec_id)
+    if not record:
+        return jsonify({'error': 'Attendance record not found'}), 404
+
+    data = request.get_json() or {}
+    if 'status' in data:
+        record.status = data['status']
+    if 'shiftType' in data:
+        record.shift_type = data['shiftType']
+    if 'lateReason' in data:
+        record.late_reason = data['lateReason']
+    if 'punchInTime' in data:
+        record.punch_in_time = data['punchInTime']
+    if 'punchOutTime' in data:
+        record.punch_out_time = data['punchOutTime']
+
+    db.session.commit()
+    log_audit(admin_id, f"{admin_user.first_name} {admin_user.last_name}", f"Updated Attendance Record #{rec_id} for {record.employee_id} to status: {record.status}", "AttendanceRecord", str(rec_id))
+
+    return jsonify({
+        'message': 'Attendance record updated successfully',
+        'record': record.to_dict()
+    }), 200
+
+
 # --- SYSTEM RESET ---
 @admin_bp.route('/reset-database', methods=['POST'])
 def reset_database():
     admin_id = get_jwt_identity()
     admin_user = Employee.query.get(admin_id)
-
     if not admin_user or admin_user.role != 'super_admin':
         return jsonify({'error': 'Unauthorized. Super Admin role required.'}), 403
 
