@@ -62,7 +62,7 @@ def create_app():
             ]
             for col_name, col_type in emp_cols:
                 try:
-                    db.session.execute(db.text(f"ALTER TABLE employees ADD COLUMN {col_name} {col_type};"))
+                    db.session.execute(db.text(f"ALTER TABLE employees ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
@@ -74,7 +74,7 @@ def create_app():
             ]
             for col_name, col_type in leave_cols:
                 try:
-                    db.session.execute(db.text(f"ALTER TABLE leave_requests ADD COLUMN {col_name} {col_type};"))
+                    db.session.execute(db.text(f"ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
@@ -85,7 +85,7 @@ def create_app():
             ]
             for col_name, col_type in doc_cols:
                 try:
-                    db.session.execute(db.text(f"ALTER TABLE documents ADD COLUMN {col_name} {col_type};"))
+                    db.session.execute(db.text(f"ALTER TABLE documents ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
@@ -102,7 +102,7 @@ def create_app():
             ]
             for col_name, col_type in rule_cols:
                 try:
-                    db.session.execute(db.text(f"ALTER TABLE attendance_rules ADD COLUMN {col_name} {col_type};"))
+                    db.session.execute(db.text(f"ALTER TABLE attendance_rules ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
@@ -113,7 +113,7 @@ def create_app():
             ]
             for col_name, col_type in rec_cols:
                 try:
-                    db.session.execute(db.text(f"ALTER TABLE attendance_records ADD COLUMN {col_name} {col_type};"))
+                    db.session.execute(db.text(f"ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
