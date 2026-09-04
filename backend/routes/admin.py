@@ -274,7 +274,9 @@ def update_employee(id):
     if 'designation' in data: employee.designation = data['designation'].strip()
     if 'department' in data: employee.department = data['department'].strip()
     if 'employmentType' in data: employee.employment_type = data['employmentType']
-    if 'reportingManagerId' in data: employee.reporting_manager_id = data['reportingManagerId']
+    if 'reportingManagerId' in data:
+        mgr_val = data['reportingManagerId']
+        employee.reporting_manager_id = str(mgr_val).strip() if (mgr_val and str(mgr_val).strip()) else None
     if 'baseSalary' in data: employee.base_salary = float(data['baseSalary'] or 0.0)
     if 'casualLeaveBalance' in data: employee.casual_leave_balance = float(data['casualLeaveBalance'] or 0.0)
     if 'sickLeaveBalance' in data: employee.sick_leave_balance = float(data['sickLeaveBalance'] or 0.0)

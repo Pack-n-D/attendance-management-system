@@ -20,6 +20,7 @@ export default function EmployeeProfile() {
   // Edit states for overview
   const [editingOverview, setEditingOverview] = useState(false);
   const [form, setForm] = useState({});
+  const [managersList, setManagersList] = useState([]);
 
   // Reset password popup
   const [resetModalData, setResetModalData] = useState(null);
@@ -99,7 +100,17 @@ export default function EmployeeProfile() {
 
   useEffect(() => {
     fetchProfileDetail();
+    fetchManagersList();
   }, [id]);
+
+  const fetchManagersList = async () => {
+    try {
+      const res = await apiFetch('/admin/employees');
+      setManagersList(res.employees || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     if (tab === 'payroll' && id) {
@@ -317,6 +328,53 @@ export default function EmployeeProfile() {
                   <input type="date" className="apc-input" value={form.dob || ''} onChange={e => setForm({ ...form, dob: e.target.value })} />
                 ) : (
                   <strong>{emp?.dob || '—'}</strong>
+                )}
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', display: 'block' }}>DATE OF JOINING</span>
+                {editingOverview ? (
+                  <input type="date" className="apc-input" value={form.dateOfJoining || ''} onChange={e => setForm({ ...form, dateOfJoining: e.target.value })} />
+                ) : (
+                  <strong>{emp?.dateOfJoining || '—'}</strong>
+                )}
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', display: 'block' }}>EMPLOYMENT TYPE</span>
+                {editingOverview ? (
+                  <select className="apc-select" value={form.employmentType || 'Full-time'} onChange={e => setForm({ ...form, employmentType: e.target.value })}>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Internship">Internship</option>
+                  </select>
+                ) : (
+                  <strong>{emp?.employmentType || 'Full-time'}</strong>
+                )}
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', display: 'block' }}>REPORTING MANAGER</span>
+                {editingOverview ? (
+                  <select
+                    className="apc-select"
+                    value={form.reportingManagerId || ''}
+                    onChange={e => setForm({ ...form, reportingManagerId: e.target.value })}
+                  >
+                    <option value="">No Manager (Reports to Super Admin)</option>
+                    {managersList
+                      .filter(m => m.id !== id && m.role !== 'super_admin')
+                      .map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.fullName} ({m.id} - {m.department})
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <strong style={{ color: emp?.reportingManagerName ? 'var(--apc-primary-dark)' : 'var(--apc-text-primary)' }}>
+                    {emp?.reportingManagerName ? `${emp.reportingManagerName} (${emp.reportingManagerId})` : 'Super Admin (Default)'}
+                  </strong>
                 )}
               </div>
 
