@@ -327,6 +327,9 @@ def calculate_monthly_salary_slip(employee, month_str: str) -> dict:
     overtime_pay = overtime_hours * overtime_rate
 
     total_covered_days = present_days + paid_leaves
+    unpaid_absent_days = max(0.0, working_days - total_covered_days)
+    unpaid_deductions = unpaid_absent_days * per_day_rate
+
     # Fetch approved reimbursements for this employee in this month
     from models import ReimbursementRequest
     approved_reimbursements_query = ReimbursementRequest.query.filter(
@@ -363,6 +366,11 @@ def calculate_monthly_salary_slip(employee, month_str: str) -> dict:
         'grossSalary': round(gross_salary, 2),
         'netSalary': round(net_salary, 2)
     }
+
+
+# Alias for backward and cross-route compatibility
+calculate_employee_salary_slip = calculate_monthly_salary_slip
+
 
 
 def calculate_haversine_distance(lat1, lon1, lat2, lon2):
