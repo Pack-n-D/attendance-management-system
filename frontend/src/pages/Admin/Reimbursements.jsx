@@ -83,9 +83,9 @@ export default function Reimbursements() {
   return (
     <>
       <Navbar />
-      <div className="apc-admin-layout">
+      <div className="apc-layout-container">
         <AdminSidebar />
-        <main className="apc-admin-main">
+        <main className="apc-main-content">
           
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
