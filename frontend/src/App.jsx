@@ -20,6 +20,7 @@ import EmployeeProfile from './pages/Admin/EmployeeProfile';
 import AttendanceLog from './pages/Admin/AttendanceLog';
 import AttendanceSettings from './pages/Admin/AttendanceSettings';
 import AuditLog from './pages/Admin/AuditLog';
+import Reimbursements from './pages/Admin/Reimbursements';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children, allowedRoles }) {
@@ -123,6 +124,14 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['super_admin']}>
                   <EmployeeProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/reimbursements"
+              element={
+                <ProtectedRoute allowedRoles={['super_admin']}>
+                  <Reimbursements />
                 </ProtectedRoute>
               }
             />

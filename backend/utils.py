@@ -327,11 +327,20 @@ def calculate_monthly_salary_slip(employee, month_str: str) -> dict:
     overtime_pay = overtime_hours * overtime_rate
 
     total_covered_days = present_days + paid_leaves
-    unpaid_absent_days = max(0.0, working_days - total_covered_days)
-    unpaid_deductions = unpaid_absent_days * per_day_rate
+    # Fetch approved reimbursements for this employee in this month
+    from models import ReimbursementRequest
+    approved_reimbursements_query = ReimbursementRequest.query.filter(
+        ReimbursementRequest.employee_id == employee.id,
+        ReimbursementRequest.status == 'approved',
+        ReimbursementRequest.expense_date >= start_date_str,
+        ReimbursementRequest.expense_date <= end_date_str
+    ).all()
 
-    gross_salary = base_salary + overtime_pay
-    net_salary = max(0.0, gross_salary - unpaid_deductions)
+    total_reimbursements = sum(r.amount for r in approved_reimbursements_query)
+    reimbursements_list = [r.to_dict() for r in approved_reimbursements_query]
+
+    gross_salary = base_salary + overtime_pay + total_reimbursements
+    net_salary = max(0.0, (base_salary + overtime_pay - unpaid_deductions) + total_reimbursements)
 
     return {
         'month': month_str,
@@ -349,6 +358,8 @@ def calculate_monthly_salary_slip(employee, month_str: str) -> dict:
         'overtimePay': round(overtime_pay, 2),
         'perDayRate': round(per_day_rate, 2),
         'unpaidDeductions': round(unpaid_deductions, 2),
+        'totalReimbursements': round(total_reimbursements, 2),
+        'reimbursementsList': reimbursements_list,
         'grossSalary': round(gross_salary, 2),
         'netSalary': round(net_salary, 2)
     }

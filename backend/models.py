@@ -36,6 +36,7 @@ class Employee(db.Model):
     reporting_manager = db.relationship('Employee', remote_side=[id], backref='direct_reports')
     documents = db.relationship('Document', backref='employee', lazy=True, cascade='all, delete-orphan')
     attendance_records = db.relationship('AttendanceRecord', backref='employee', lazy=True, cascade='all, delete-orphan')
+    reimbursements = db.relationship('ReimbursementRequest', backref='employee', lazy=True, cascade='all, delete-orphan')
 
     def __init__(self, **kwargs):
         super(Employee, self).__init__(**kwargs)
@@ -314,5 +315,45 @@ class SalarySlip(db.Model):
             'status': self.status,
             'createdAt': self.created_at.isoformat() if self.created_at else None
         }
+
+
+class ReimbursementRequest(db.Model):
+    __tablename__ = 'reimbursement_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.String(20), db.ForeignKey('employees.id'), nullable=False)
+    category = db.Column(db.String(50), nullable=False)  # 'Petrol', 'Hotel', 'Food', 'Travel', 'Internet/Mobile', 'Client Meeting', 'Other'
+    amount = db.Column(db.Float, nullable=False)
+    expense_date = db.Column(db.String(10), nullable=False)  # YYYY-MM-DD
+    description = db.Column(db.Text, nullable=True)
+    receipt_photo_url = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default='pending')  # 'pending', 'approved', 'rejected'
+    admin_comment = db.Column(db.Text, nullable=True)
+    reviewed_by = db.Column(db.String(20), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        super(ReimbursementRequest, self).__init__(**kwargs)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'employeeId': self.employee_id,
+            'employeeName': f"{self.employee.first_name} {self.employee.last_name}" if self.employee else self.employee_id,
+            'department': self.employee.department if self.employee else None,
+            'designation': self.employee.designation if self.employee else None,
+            'category': self.category,
+            'amount': round(self.amount, 2),
+            'expenseDate': self.expense_date,
+            'description': self.description,
+            'receiptPhotoUrl': self.receipt_photo_url,
+            'status': self.status,
+            'adminComment': self.admin_comment,
+            'reviewedBy': self.reviewed_by,
+            'reviewedAt': self.reviewed_at.isoformat() if self.reviewed_at else None,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
+
 
 

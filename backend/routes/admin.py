@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from models import db, Employee, Document, AttendanceRecord, AttendanceRule, Holiday, AuditLog, LeaveRequest
+from models import db, Employee, Document, AttendanceRecord, AttendanceRule, Holiday, AuditLog, LeaveRequest, ReimbursementRequest
 from utils import generate_employee_id, validate_password, generate_random_password, log_audit, get_current_now, get_current_date_str, get_current_time_str, save_base64_photo
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -691,6 +691,98 @@ def update_attendance_record(rec_id):
     return jsonify({
         'message': 'Attendance record updated successfully',
         'record': record.to_dict()
+    }), 200
+
+
+# --- ADMIN REIMBURSEMENT MANAGEMENT ---
+
+@admin_bp.route('/reimbursements', methods=['GET'])
+def get_all_reimbursements():
+    status = request.args.get('status')
+    search = request.args.get('search')
+    category = request.args.get('category')
+    start_date = request.args.get('startDate')
+    end_date = request.args.get('endDate')
+
+    query = ReimbursementRequest.query.join(Employee, ReimbursementRequest.employee_id == Employee.id)
+
+    if status:
+        query = query.filter(ReimbursementRequest.status == status)
+
+    if category:
+        query = query.filter(ReimbursementRequest.category == category)
+
+    if start_date:
+        query = query.filter(ReimbursementRequest.expense_date >= start_date)
+
+    if end_date:
+        query = query.filter(ReimbursementRequest.expense_date <= end_date)
+
+    if search:
+        search_pattern = f"%{search.strip()}%"
+        query = query.filter(
+            (Employee.first_name.ilike(search_pattern)) |
+            (Employee.last_name.ilike(search_pattern)) |
+            (Employee.id.ilike(search_pattern)) |
+            (ReimbursementRequest.description.ilike(search_pattern))
+        )
+
+    all_requests = ReimbursementRequest.query.all()
+    filtered_requests = query.order_by(ReimbursementRequest.expense_date.desc(), ReimbursementRequest.id.desc()).all()
+
+    total_claimed = sum(r.amount for r in all_requests)
+    total_approved = sum(r.amount for r in all_requests if r.status == 'approved')
+    total_pending = sum(r.amount for r in all_requests if r.status == 'pending')
+    total_rejected = sum(r.amount for r in all_requests if r.status == 'rejected')
+
+    return jsonify({
+        'reimbursements': [r.to_dict() for r in filtered_requests],
+        'stats': {
+            'totalClaimed': round(total_claimed, 2),
+            'totalApproved': round(total_approved, 2),
+            'totalPending': round(total_pending, 2),
+            'totalRejected': round(total_rejected, 2),
+            'pendingCount': len([r for r in all_requests if r.status == 'pending'])
+        }
+    }), 200
+
+
+@admin_bp.route('/reimbursements/<int:id>/review', methods=['POST'])
+def review_reimbursement(id):
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    reimb = ReimbursementRequest.query.get(id)
+    if not reimb:
+        return jsonify({'error': 'Reimbursement request not found'}), 404
+
+    data = request.get_json() or {}
+    action = data.get('action', '').lower()  # 'approve' or 'reject'
+    admin_comment = data.get('comment', '').strip()
+
+    if action not in ['approve', 'reject']:
+        return jsonify({'error': 'Invalid review action. Must be approve or reject.'}), 400
+
+    new_status = 'approved' if action == 'approve' else 'rejected'
+    reimb.status = new_status
+    reimb.admin_comment = admin_comment
+    reimb.reviewed_by = admin_id
+    reimb.reviewed_at = datetime.utcnow()
+
+    db.session.commit()
+
+    log_audit(
+        admin_id,
+        admin_name,
+        f"{new_status.capitalize()} Reimbursement Claim #{reimb.id} (₹{reimb.amount:.2f} for {reimb.category}) for Employee {reimb.employee_id}",
+        "ReimbursementRequest",
+        str(reimb.id)
+    )
+
+    return jsonify({
+        'message': f"Reimbursement claim #{reimb.id} ({reimb.category} - ₹{reimb.amount:.2f}) {new_status} successfully.",
+        'reimbursement': reimb.to_dict()
     }), 200
 
 

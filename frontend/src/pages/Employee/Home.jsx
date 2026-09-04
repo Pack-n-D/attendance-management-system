@@ -4,7 +4,7 @@ import StatusBadge from '../../components/StatusBadge';
 import { apiFetch } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { DEFAULT_OFFICE_CONFIG, calculateDistanceMeters } from '../../utils/constants';
-import { Camera, CheckCircle2, Clock, MapPin, AlertTriangle, RefreshCw, Send, Calendar, UserCheck, Check, X, FileText } from 'lucide-react';
+import { Camera, CheckCircle2, Clock, MapPin, AlertTriangle, RefreshCw, Send, Calendar, UserCheck, Check, X, FileText, Receipt, Plus, Trash2, DollarSign, Image } from 'lucide-react';
 
 export default function Home() {
   const { user } = useAuth();
@@ -47,6 +47,20 @@ export default function Home() {
   const [withdrawReason, setWithdrawReason] = useState('');
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
 
+  // Reimbursement State
+  const [myReimbursements, setMyReimbursements] = useState([]);
+  const [reimbStats, setReimbStats] = useState({ totalClaimed: 0, totalApproved: 0, totalPending: 0 });
+  const [loadingReimb, setLoadingReimb] = useState(false);
+  const [showReimbModal, setShowReimbModal] = useState(false);
+  const [reimbCategory, setReimbCategory] = useState('Petrol');
+  const [reimbAmount, setReimbAmount] = useState('');
+  const [reimbExpenseDate, setReimbExpenseDate] = useState(new Date().toISOString().slice(0, 10));
+  const [reimbDescription, setReimbDescription] = useState('');
+  const [reimbReceiptPhoto, setReimbReceiptPhoto] = useState(null);
+  const [submittingReimb, setSubmittingReimb] = useState(false);
+  const [reimbMsg, setReimbMsg] = useState('');
+  const [deletingReimbId, setDeletingReimbId] = useState(null);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -55,7 +69,7 @@ export default function Home() {
   const [liveTime, setLiveTime] = useState(new Date());
 
   // MNC Portal state
-  const [activePortalTab, setActivePortalTab] = useState('dashboard'); // 'dashboard' or 'salary'
+  const [activePortalTab, setActivePortalTab] = useState('dashboard'); // 'dashboard', 'reimbursements', 'salary'
   const [salaryMonth, setSalaryMonth] = useState(new Date().toISOString().slice(0, 7));
   const [salarySlip, setSalarySlip] = useState(null);
   const [loadingSalary, setLoadingSalary] = useState(false);
@@ -65,6 +79,7 @@ export default function Home() {
     fetchTodayStatus();
     fetchLeaveData();
     fetchProfile();
+    fetchMyReimbursements();
 
     const timer = setInterval(() => {
       setLiveTime(new Date());
@@ -93,9 +108,82 @@ export default function Home() {
     }
   };
 
+  const fetchMyReimbursements = async () => {
+    setLoadingReimb(true);
+    try {
+      const res = await apiFetch('/employee/reimbursements');
+      setMyReimbursements(res.reimbursements || []);
+      setReimbStats({
+        totalClaimed: res.totalClaimed || 0,
+        totalApproved: res.totalApproved || 0,
+        totalPending: res.totalPending || 0
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingReimb(false);
+    }
+  };
+
+  const handleSubmitReimbursement = async (e) => {
+    e.preventDefault();
+    setSubmittingReimb(true);
+    setReimbMsg('');
+    try {
+      const res = await apiFetch('/employee/reimbursements', {
+        method: 'POST',
+        body: JSON.stringify({
+          category: reimbCategory,
+          amount: parseFloat(reimbAmount),
+          expenseDate: reimbExpenseDate,
+          description: reimbDescription,
+          receiptPhoto: reimbReceiptPhoto
+        })
+      });
+      setReimbMsg(res.message);
+      setReimbAmount('');
+      setReimbDescription('');
+      setReimbReceiptPhoto(null);
+      fetchMyReimbursements();
+      setTimeout(() => {
+        setShowReimbModal(false);
+        setReimbMsg('');
+      }, 1500);
+    } catch (err) {
+      setReimbMsg(`Error: ${err.message}`);
+    } finally {
+      setSubmittingReimb(false);
+    }
+  };
+
+  const handleDeleteReimbursement = async (id) => {
+    if (!window.confirm("Are you sure you want to cancel this reimbursement request?")) return;
+    setDeletingReimbId(id);
+    try {
+      await apiFetch(`/employee/reimbursements/${id}`, { method: 'DELETE' });
+      fetchMyReimbursements();
+    } catch (err) {
+      alert("Failed to cancel: " + err.message);
+    } finally {
+      setDeletingReimbId(null);
+    }
+  };
+
+  const handleReceiptUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReimbReceiptPhoto(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   useEffect(() => {
     if (activePortalTab === 'salary') {
       fetchMySalarySlip(salaryMonth);
+    } else if (activePortalTab === 'reimbursements') {
+      fetchMyReimbursements();
     }
   }, [activePortalTab, salaryMonth]);
 
@@ -407,19 +495,31 @@ export default function Home() {
             </p>
           </div>
 
-          <button onClick={() => setShowLeaveModal(true)} className="apc-btn apc-btn-secondary" style={{ padding: '0.5rem 0.85rem', fontSize: '0.85rem' }}>
-            <Calendar size={16} /> Apply for Leave
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button onClick={() => setShowReimbModal(true)} className="apc-btn apc-btn-primary" style={{ padding: '0.5rem 0.85rem', fontSize: '0.85rem' }}>
+              <Plus size={16} /> Claim Reimbursement
+            </button>
+            <button onClick={() => setShowLeaveModal(true)} className="apc-btn apc-btn-secondary" style={{ padding: '0.5rem 0.85rem', fontSize: '0.85rem' }}>
+              <Calendar size={16} /> Apply for Leave
+            </button>
+          </div>
         </div>
 
         {/* MNC Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--apc-border)' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--apc-border)', flexWrap: 'wrap' }}>
           <button
             onClick={() => setActivePortalTab('dashboard')}
             className={`apc-btn ${activePortalTab === 'dashboard' ? 'apc-btn-primary' : 'apc-btn-secondary'}`}
             style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '0.5rem 1rem' }}
           >
             <UserCheck size={16} /> Portal Dashboard
+          </button>
+          <button
+            onClick={() => setActivePortalTab('reimbursements')}
+            className={`apc-btn ${activePortalTab === 'reimbursements' ? 'apc-btn-primary' : 'apc-btn-secondary'}`}
+            style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '0.5rem 1rem' }}
+          >
+            <Receipt size={16} /> Reimbursements {reimbStats.totalPending > 0 && <span style={{ background: '#D97706', color: '#fff', fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', marginLeft: '4px' }}>{myReimbursements.filter(r => r.status === 'pending').length}</span>}
           </button>
           <button
             onClick={() => setActivePortalTab('salary')}
@@ -753,6 +853,150 @@ export default function Home() {
         </>
         )}
 
+        {/* REIMBURSEMENTS TAB VIEW */}
+        {activePortalTab === 'reimbursements' && (
+          <div className="apc-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Receipt size={18} color="var(--apc-primary)" /> My Expense Reimbursements
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)', margin: '2px 0 0 0' }}>
+                  Claim official travel, petrol, hotel & client expenses. Approved claims credit into your monthly salary.
+                </p>
+              </div>
+
+              <button onClick={() => setShowReimbModal(true)} className="apc-btn apc-btn-primary" style={{ padding: '0.45rem 0.9rem' }}>
+                <Plus size={16} /> New Reimbursement Claim
+              </button>
+            </div>
+
+            {/* Reimbursement Stats Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', border: '1px solid var(--apc-border)', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block' }}>TOTAL CLAIMED</span>
+                <strong style={{ fontSize: '1.25rem', color: 'var(--apc-text-primary)' }}>₹{reimbStats.totalClaimed.toLocaleString('en-IN')}</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--apc-text-secondary)', display: 'block' }}>{myReimbursements.length} Claims</span>
+              </div>
+
+              <div style={{ padding: '0.85rem', background: 'rgba(46, 158, 91, 0.08)', borderRadius: 'var(--apc-radius-sm)', border: '1px solid rgba(46, 158, 91, 0.3)', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#1E6B3C', display: 'block' }}>APPROVED (CREDITED)</span>
+                <strong style={{ fontSize: '1.25rem', color: 'var(--apc-success)' }}>₹{reimbStats.totalApproved.toLocaleString('en-IN')}</strong>
+                <span style={{ fontSize: '0.7rem', color: '#1E6B3C', display: 'block' }}>In Salary Slip</span>
+              </div>
+
+              <div style={{ padding: '0.85rem', background: 'rgba(245, 166, 35, 0.08)', borderRadius: 'var(--apc-radius-sm)', border: '1px solid rgba(245, 166, 35, 0.3)', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#B45309', display: 'block' }}>PENDING APPROVAL</span>
+                <strong style={{ fontSize: '1.25rem', color: '#D97706' }}>₹{reimbStats.totalPending.toLocaleString('en-IN')}</strong>
+                <span style={{ fontSize: '0.7rem', color: '#B45309', display: 'block' }}>Awaiting Admin</span>
+              </div>
+            </div>
+
+            {/* Claims History List */}
+            <h4 style={{ fontSize: '0.95rem', color: 'var(--apc-text-secondary)', textTransform: 'uppercase', marginBottom: '0.65rem', letterSpacing: '0.5px' }}>
+              REIMBURSEMENT CLAIMS HISTORY
+            </h4>
+
+            {loadingReimb ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--apc-text-secondary)' }}>Loading claims...</div>
+            ) : myReimbursements.length === 0 ? (
+              <div style={{ padding: '2.5rem', textAlign: 'center', background: 'var(--apc-bg)', borderRadius: 'var(--apc-radius-sm)', border: '1px dashed var(--apc-border)' }}>
+                <Receipt size={36} color="var(--apc-text-secondary)" style={{ opacity: 0.5, marginBottom: '0.5rem' }} />
+                <p style={{ margin: 0, color: 'var(--apc-text-secondary)', fontSize: '0.9rem' }}>No reimbursement claims submitted yet.</p>
+                <button onClick={() => setShowReimbModal(true)} className="apc-btn apc-btn-secondary" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+                  <Plus size={15} /> Submit Your First Claim
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {myReimbursements.map(r => (
+                  <div
+                    key={r.id}
+                    style={{
+                      padding: '1rem',
+                      borderRadius: 'var(--apc-radius-sm)',
+                      background: 'var(--apc-surface)',
+                      border: '1px solid var(--apc-border)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem'
+                    }}
+                  >
+                    <div style={{ minWidth: '220px', flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <strong style={{ fontSize: '1rem', color: 'var(--apc-text-primary)' }}>{r.category}</strong>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)' }}>• {r.expenseDate}</span>
+                        <StatusBadge status={r.status} />
+                      </div>
+                      
+                      {r.description && (
+                        <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: 'var(--apc-text-secondary)' }}>
+                          {r.description}
+                        </p>
+                      )}
+
+                      {r.adminComment && (
+                        <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', background: 'var(--apc-bg)', padding: '0.3rem 0.5rem', borderRadius: '4px', borderLeft: '3px solid var(--apc-primary)' }}>
+                          <strong>Admin Note:</strong> {r.adminComment}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      {r.receiptPhotoUrl && (
+                        <a
+                          href={r.receiptPhotoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.78rem',
+                            color: 'var(--apc-primary-dark)',
+                            textDecoration: 'none',
+                            padding: '0.3rem 0.6rem',
+                            background: 'var(--apc-bg)',
+                            borderRadius: '4px',
+                            border: '1px solid var(--apc-border)'
+                          }}
+                        >
+                          <Image size={14} /> Receipt
+                        </a>
+                      )}
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: r.status === 'approved' ? 'var(--apc-success)' : 'var(--apc-text-primary)' }}>
+                          ₹{r.amount.toLocaleString('en-IN')}
+                        </div>
+                        {r.status === 'approved' && (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--apc-success)', display: 'block' }}>
+                            ✓ In Payslip
+                          </span>
+                        )}
+                      </div>
+
+                      {r.status === 'pending' && (
+                        <button
+                          onClick={() => handleDeleteReimbursement(r.id)}
+                          disabled={deletingReimbId === r.id}
+                          className="apc-btn apc-btn-secondary"
+                          style={{ padding: '0.35rem 0.5rem', color: 'var(--apc-danger)' }}
+                          title="Cancel Request"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* MY SALARY SLIPS TAB VIEW */}
         {activePortalTab === 'salary' && (
           <div className="apc-card">
@@ -869,6 +1113,26 @@ export default function Home() {
                         <td>Taxes / Statutory</td>
                         <td style={{ textAlign: 'right' }}>₹0.00</td>
                       </tr>
+
+                      {/* Approved Reimbursement Line Item */}
+                      {salarySlip.totalReimbursements > 0 && (
+                        <tr style={{ background: 'rgba(46, 158, 91, 0.08)' }}>
+                          <td>
+                            <strong style={{ color: '#1E6B3C' }}>Reimbursement Credit (Approved)</strong>
+                            {salarySlip.reimbursementsList && salarySlip.reimbursementsList.length > 0 && (
+                              <div style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', marginTop: '2px' }}>
+                                Note: {salarySlip.reimbursementsList.map(r => `${r.category}: ₹${r.amount}`).join(' + ')}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right', color: 'var(--apc-success)', fontWeight: 700 }}>
+                            + ₹{salarySlip.totalReimbursements.toLocaleString('en-IN')}
+                          </td>
+                          <td>—</td>
+                          <td style={{ textAlign: 'right' }}>—</td>
+                        </tr>
+                      )}
+
                       <tr style={{ background: 'var(--apc-bg)', fontWeight: 'bold' }}>
                         <td>GROSS EARNINGS</td>
                         <td style={{ textAlign: 'right', color: 'var(--apc-primary-dark)' }}>₹{salarySlip.grossSalary.toLocaleString('en-IN')}</td>
@@ -886,7 +1150,7 @@ export default function Home() {
                       TOTAL NET PAYABLE SALARY
                     </span>
                     <p style={{ fontSize: '0.8rem', margin: '2px 0 0 0', color: 'var(--apc-text-secondary)' }}>
-                      Direct Bank Transfer / Auto-Disbursed
+                      Direct Bank Transfer / Auto-Disbursed {salarySlip.totalReimbursements > 0 ? `(Includes ₹${salarySlip.totalReimbursements} Reimbursements)` : ''}
                     </p>
                   </div>
                   <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--apc-primary-dark)' }}>
@@ -970,6 +1234,124 @@ export default function Home() {
                   </button>
                   <button type="submit" className="apc-btn apc-btn-primary" disabled={submittingLeave}>
                     <Send size={16} /> {submittingLeave ? 'Submitting...' : 'Submit Request'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Claim Reimbursement Modal */}
+        {showReimbModal && (
+          <div className="apc-modal-overlay">
+            <div className="apc-modal" style={{ maxWidth: '480px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <Receipt size={20} color="var(--apc-primary)" /> Claim Expense Reimbursement
+                </h3>
+                <button onClick={() => setShowReimbModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <X size={20} color="var(--apc-text-secondary)" />
+                </button>
+              </div>
+
+              {reimbMsg && (
+                <div style={{
+                  padding: '0.75rem',
+                  borderRadius: 'var(--apc-radius-sm)',
+                  marginBottom: '1rem',
+                  fontSize: '0.85rem',
+                  background: reimbMsg.startsWith('Error') ? 'rgba(229, 57, 53, 0.12)' : 'rgba(46, 158, 91, 0.12)',
+                  color: reimbMsg.startsWith('Error') ? 'var(--apc-danger)' : 'var(--apc-success)',
+                  border: `1px solid ${reimbMsg.startsWith('Error') ? 'var(--apc-danger)' : 'var(--apc-success)'}`
+                }}>
+                  {reimbMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmitReimbursement}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem' }}>
+                  <div className="apc-form-group">
+                    <label>Expense Category <span className="required">*</span></label>
+                    <select
+                      className="apc-select"
+                      required
+                      value={reimbCategory}
+                      onChange={e => setReimbCategory(e.target.value)}
+                    >
+                      <option value="Petrol">⛽ Petrol / Fuel</option>
+                      <option value="Hotel">🏨 Hotel / Accommodation</option>
+                      <option value="Food">🍽️ Food & Meals</option>
+                      <option value="Travel">✈️ Travel / Cab / Bus</option>
+                      <option value="Internet/Mobile">📱 Mobile / Internet Bill</option>
+                      <option value="Client Meeting">🤝 Client Entertainment</option>
+                      <option value="Office Supplies">📦 Office Supplies</option>
+                      <option value="Other">📝 Other Expense</option>
+                    </select>
+                  </div>
+
+                  <div className="apc-form-group">
+                    <label>Amount (₹) <span className="required">*</span></label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      className="apc-input"
+                      required
+                      placeholder="e.g. 300"
+                      value={reimbAmount}
+                      onChange={e => setReimbAmount(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="apc-form-group">
+                  <label>Expense Date <span className="required">*</span></label>
+                  <input
+                    type="date"
+                    className="apc-input"
+                    required
+                    value={reimbExpenseDate}
+                    onChange={e => setReimbExpenseDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="apc-form-group">
+                  <label>Description / Notes</label>
+                  <textarea
+                    className="apc-textarea"
+                    rows={2}
+                    placeholder="e.g. Petrol for site visit to client office / Hotel stay in Pune..."
+                    value={reimbDescription}
+                    onChange={e => setReimbDescription(e.target.value)}
+                  />
+                </div>
+
+                <div className="apc-form-group">
+                  <label>Attach Bill / Receipt Photo (Optional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="apc-input"
+                    onChange={handleReceiptUpload}
+                  />
+                  {reimbReceiptPhoto && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <img src={reimbReceiptPhoto} alt="Receipt preview" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--apc-border)' }} />
+                      <span style={{ fontSize: '0.8rem', color: 'var(--apc-success)' }}>✓ Receipt image attached</span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', marginBottom: '1.25rem', background: 'var(--apc-surface)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
+                  ℹ️ Once approved by Admin, this ₹{reimbAmount || '0'} will be automatically credited to your monthly salary slip.
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setShowReimbModal(false)} className="apc-btn apc-btn-secondary" disabled={submittingReimb}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="apc-btn apc-btn-primary" disabled={submittingReimb}>
+                    <Send size={16} /> {submittingReimb ? 'Submitting...' : 'Submit Claim'}
                   </button>
                 </div>
               </form>

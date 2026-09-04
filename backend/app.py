@@ -118,7 +118,7 @@ def create_app():
                 except Exception:
                     db.session.rollback()
 
-            from models import Employee, AttendanceRule
+            from models import Employee, AttendanceRule, ReimbursementRequest
             from werkzeug.security import generate_password_hash
 
             # Ensure existing AttendanceRule is updated with newest office coordinates & 120m radius

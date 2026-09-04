@@ -3,7 +3,7 @@ import base64
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Employee, Document, AttendanceRecord, AuditLog, LeaveRequest
+from models import db, Employee, Document, AttendanceRecord, AuditLog, LeaveRequest, ReimbursementRequest
 from utils import log_audit, save_base64_photo
 
 employee_bp = Blueprint('employee', __name__, url_prefix='/api/employee')
@@ -372,12 +372,114 @@ def get_my_salary_slips():
     if not month_str:
         month_str = datetime.utcnow().strftime('%Y-%m')
 
-    from utils import calculate_monthly_salary_slip
-    salary_slip_data = calculate_monthly_salary_slip(employee, month_str)
+    from utils import calculate_employee_salary_slip
+    salary_slip_data = calculate_employee_salary_slip(employee, month_str)
 
     return jsonify({
         'employee': employee.to_dict(),
         'salarySlip': salary_slip_data
     }), 200
+
+
+# --- REIMBURSEMENT MANAGEMENT ---
+
+@employee_bp.route('/reimbursements', methods=['GET'])
+@jwt_required()
+def get_my_reimbursements():
+    user_id = get_jwt_identity()
+    requests = ReimbursementRequest.query.filter_by(employee_id=user_id).order_by(
+        ReimbursementRequest.expense_date.desc(),
+        ReimbursementRequest.id.desc()
+    ).all()
+
+    total_claimed = sum(r.amount for r in requests)
+    total_approved = sum(r.amount for r in requests if r.status == 'approved')
+    total_pending = sum(r.amount for r in requests if r.status == 'pending')
+
+    return jsonify({
+        'reimbursements': [r.to_dict() for r in requests],
+        'totalClaimed': round(total_claimed, 2),
+        'totalApproved': round(total_approved, 2),
+        'totalPending': round(total_pending, 2)
+    }), 200
+
+
+@employee_bp.route('/reimbursements', methods=['POST'])
+@jwt_required()
+def submit_reimbursement():
+    user_id = get_jwt_identity()
+    employee = Employee.query.get(user_id)
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+
+    data = request.get_json() or {}
+    category = data.get('category', '').strip()
+    amount_raw = data.get('amount')
+    expense_date = data.get('expenseDate', '').strip()
+    description = data.get('description', '').strip()
+    receipt_photo = data.get('receiptPhoto')
+
+    if not category:
+        return jsonify({'error': 'Expense category is required (e.g. Petrol, Hotel, Food)'}), 400
+
+    try:
+        amount = float(amount_raw)
+        if amount <= 0:
+            return jsonify({'error': 'Reimbursement amount must be greater than 0'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid reimbursement amount'}), 400
+
+    if not expense_date:
+        expense_date = datetime.utcnow().strftime('%Y-%m-%d')
+
+    photo_url = None
+    if receipt_photo:
+        photo_url = save_base64_photo(receipt_photo, folder_name=f"receipt_{user_id}")
+
+    reimb = ReimbursementRequest(
+        employee_id=user_id,
+        category=category,
+        amount=amount,
+        expense_date=expense_date,
+        description=description,
+        receipt_photo_url=photo_url,
+        status='pending'
+    )
+    db.session.add(reimb)
+    db.session.commit()
+
+    log_audit(
+        user_id,
+        f"{employee.first_name} {employee.last_name}",
+        f"Submitted Reimbursement Claim #{reimb.id} for ₹{amount:.2f} ({category}) on {expense_date}",
+        "ReimbursementRequest",
+        str(reimb.id)
+    )
+
+    return jsonify({
+        'message': f'Reimbursement request of ₹{amount:.2f} for {category} submitted successfully and sent to Admin for approval.',
+        'reimbursement': reimb.to_dict()
+    }), 201
+
+
+@employee_bp.route('/reimbursements/<int:id>', methods=['DELETE'])
+@jwt_required()
+def delete_my_reimbursement(id):
+    user_id = get_jwt_identity()
+    reimb = ReimbursementRequest.query.get(id)
+    if not reimb:
+        return jsonify({'error': 'Reimbursement request not found'}), 404
+
+    if reimb.employee_id != user_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    if reimb.status != 'pending':
+        return jsonify({'error': f'Cannot cancel a reimbursement that is already {reimb.status}'}), 400
+
+    db.session.delete(reimb)
+    db.session.commit()
+
+    return jsonify({'message': 'Reimbursement request cancelled successfully'}), 200
+
 
 

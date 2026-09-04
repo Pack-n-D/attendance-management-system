@@ -506,6 +506,26 @@ export default function EmployeeProfile() {
                         <td>Taxes / Statutory</td>
                         <td style={{ textAlign: 'right' }}>₹0.00</td>
                       </tr>
+
+                      {/* Approved Reimbursement Line Item */}
+                      {salarySlip.totalReimbursements > 0 && (
+                        <tr style={{ background: 'rgba(46, 158, 91, 0.08)' }}>
+                          <td>
+                            <strong style={{ color: '#1E6B3C' }}>Reimbursement Credit (Approved)</strong>
+                            {salarySlip.reimbursementsList && salarySlip.reimbursementsList.length > 0 && (
+                              <div style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', marginTop: '2px' }}>
+                                Note: {salarySlip.reimbursementsList.map(r => `${r.category}: ₹${r.amount}`).join(' + ')}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right', color: 'var(--apc-success)', fontWeight: 700 }}>
+                            + ₹{salarySlip.totalReimbursements.toLocaleString('en-IN')}
+                          </td>
+                          <td>—</td>
+                          <td style={{ textAlign: 'right' }}>—</td>
+                        </tr>
+                      )}
+
                       <tr style={{ background: 'var(--apc-bg)', fontWeight: 'bold' }}>
                         <td>GROSS EARNINGS</td>
                         <td style={{ textAlign: 'right', color: 'var(--apc-primary-dark)' }}>₹{salarySlip.grossSalary.toLocaleString('en-IN')}</td>
@@ -523,7 +543,7 @@ export default function EmployeeProfile() {
                       TOTAL NET PAYABLE SALARY
                     </span>
                     <p style={{ fontSize: '0.8rem', margin: '2px 0 0 0', color: 'var(--apc-text-secondary)' }}>
-                      Direct Bank Transfer / Auto-Disbursed
+                      Direct Bank Transfer / Auto-Disbursed {salarySlip.totalReimbursements > 0 ? `(Includes ₹${salarySlip.totalReimbursements} Reimbursements)` : ''}
                     </p>
                   </div>
                   <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--apc-primary-dark)' }}>
