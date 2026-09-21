@@ -23,6 +23,18 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Listen for storage events when logging in/out in another tab
+    const handleStorageChange = (e) => {
+      if (e.key === 'apc_token' || e.key === 'apc_user') {
+        const latestToken = localStorage.getItem('apc_token');
+        const latestUser = safeParseJSON(localStorage.getItem('apc_user'));
+        setToken(latestToken);
+        setUser(latestUser);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
     if (token && !user) {
       apiFetch('/auth/me')
         .then(res => {
@@ -35,6 +47,10 @@ export function AuthProvider({ children }) {
         })
         .catch(() => logout());
     }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [token]);
 
   const login = async (identifier, password) => {
