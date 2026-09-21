@@ -102,9 +102,12 @@ export default function AttendanceCalendar({ user, currentRule }) {
   const todayYMD = today.toISOString().slice(0, 10);
 
   // Weekly off rules (default Sunday)
-  const weeklyOffList = (currentRule?.weeklyOffs || 'Sunday')
-    .split(',')
-    .map(w => w.trim().toLowerCase());
+  const rawWeeklyOffs = currentRule?.weeklyOffs;
+  const weeklyOffList = Array.isArray(rawWeeklyOffs)
+    ? rawWeeklyOffs.map(w => String(w).trim().toLowerCase())
+    : (typeof rawWeeklyOffs === 'string'
+        ? rawWeeklyOffs.split(',').map(w => w.trim().toLowerCase())
+        : ['sunday']);
 
   // Map data per day
   const dayDetailsMap = {};
