@@ -1,6 +1,6 @@
 import os
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models import db, Employee, AttendanceRecord, AttendanceRule, Holiday, AuditLog
@@ -41,12 +41,8 @@ def get_today_status():
     if not rule:
         rule = AttendanceRule()
 
+    # Query strictly for today's record in IST date (Maharashtra GMT+5:30)
     record = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
-    if not record:
-        # Fallback check for UTC date if different
-        utc_date = datetime.utcnow().strftime('%Y-%m-%d')
-        if utc_date != today_str:
-            record = AttendanceRecord.query.filter_by(employee_id=user_id, date=utc_date).first()
     
     return jsonify({
         'todayDate': today_str,
@@ -65,9 +61,9 @@ def punch_in():
         return jsonify({'error': 'Employee not found'}), 404
 
     data = request.get_json() or {}
-    client_time = data.get('clientTime')
     today_str = get_current_date_str()
-    now_time_str = client_time if (client_time and len(client_time) >= 5) else get_current_time_str()
+    # Authoritative Server Time in IST (Maharashtra GMT+5:30)
+    now_time_str = get_current_time_str()
 
     # Check if already punched in
     existing = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
@@ -156,10 +152,14 @@ def punch_in():
 @jwt_required()
 def punch_out():
     user_id = get_jwt_identity()
+    employee = Employee.query.get(user_id)
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+
     data = request.get_json() or {}
-    client_time = data.get('clientTime')
     today_str = get_current_date_str()
-    now_time_str = client_time if (client_time and len(client_time) >= 5) else get_current_time_str()
+    # Authoritative Server Time in IST (Maharashtra GMT+5:30)
+    now_time_str = get_current_time_str()
 
     rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
     if not rule:
@@ -183,19 +183,12 @@ def punch_out():
         location = f"AP Corporation Office ({geo_dist}m)"
 
     record = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
-    if not record:
-        ideal_in = getattr(rule, 'ideal_punch_in_time', '10:00') + ":00"
-        record = AttendanceRecord(
-            employee_id=user_id,
-            date=today_str,
-            punch_in_time=ideal_in,
-            status='on_time',
-            shift_type='full_day'
-        )
-        db.session.add(record)
-    elif not record.punch_in_time:
-        ideal_in = getattr(rule, 'ideal_punch_in_time', '10:00') + ":00"
-        record.punch_in_time = ideal_in
+    
+    # Require punch in first - NEVER fabricate a fake punch-in record
+    if not record or not record.punch_in_time:
+        return jsonify({
+            'error': 'You have not punched in today. Please punch in first before punching out.'
+        }), 400
 
     if record.punch_out_time:
         return jsonify({'error': f'Already punched out today at {record.punch_out_time}'}), 400
@@ -224,7 +217,10 @@ def punch_out():
             out_fmt = '%H:%M:%S' if len(now_time_str) == 8 else '%H:%M'
             t1 = datetime.strptime(record.punch_in_time, in_fmt)
             t2 = datetime.strptime(now_time_str, out_fmt)
-            worked_seconds = (t2 - t1).seconds
+            if t2 >= t1:
+                worked_seconds = (t2 - t1).seconds
+            else:
+                worked_seconds = (t2 + timedelta(days=1) - t1).seconds
             worked_hours = round(worked_seconds / 3600.0, 2)
 
             ideal_in_str = getattr(rule, 'ideal_punch_in_time', '09:30') or '09:30'

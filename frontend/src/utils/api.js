@@ -14,7 +14,7 @@ export function getPhotoUrl(photoUrl) {
   return `${backendHost}${photoUrl.startsWith('/') ? '' : '/'}${photoUrl}`;
 }
 
-export async function apiFetch(endpoint, options = {}) {
+export async function apiFetch(endpoint, options = {}, retries = 2) {
   const token = localStorage.getItem('apc_token');
 
   const headers = {
@@ -26,16 +26,29 @@ export async function apiFetch(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers
+    });
+  } catch (netErr) {
+    // If mobile network re-establishing or cold container waking up, retry GETs automatically
+    if (retries > 0 && (!options.method || options.method.toUpperCase() === 'GET')) {
+      await new Promise(r => setTimeout(r, 1000));
+      return apiFetch(endpoint, options, retries - 1);
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('You are currently offline. Please check your internet connection.');
+    }
+    throw new Error('Unable to connect to attendance server. Please check your internet connection.');
+  }
 
   let data = {};
   const text = await response.text();
   if (text.trim().startsWith('<') || text.trim().toLowerCase().startsWith('<!doctype')) {
     if (!response.ok) {
-      throw new Error(`Server error (${response.status}). Backend is applying database updates — please retry in 10 seconds.`);
+      throw new Error(`Server error (${response.status}). Backend is starting up — please retry in 5 seconds.`);
     }
     throw new Error('Backend API URL misconfigured. Received HTML page instead of JSON API response.');
   }
@@ -44,7 +57,7 @@ export async function apiFetch(endpoint, options = {}) {
     data = text ? JSON.parse(text) : {};
   } catch (parseErr) {
     if (!response.ok) {
-      throw new Error(`Server returned ${response.status}. Backend may be restarting — please try again in 30 seconds.`);
+      throw new Error(`Server returned ${response.status}. Backend may be restarting — please try again in 10 seconds.`);
     }
     throw new Error('Invalid JSON response received from API server.');
   }

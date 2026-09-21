@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
+import AttendanceCalendar from '../../components/AttendanceCalendar';
 import { apiFetch } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { DEFAULT_OFFICE_CONFIG, calculateDistanceMeters } from '../../utils/constants';
@@ -65,8 +66,9 @@ export default function Home() {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
 
-  // Live ticking clock state
+  // Live ticking clock & real-time sync state
   const [liveTime, setLiveTime] = useState(new Date());
+  const lastSyncDateRef = useRef(new Date().toDateString());
 
   // MNC Portal state
   const [activePortalTab, setActivePortalTab] = useState('dashboard'); // 'dashboard', 'reimbursements', 'salary'
@@ -75,16 +77,62 @@ export default function Home() {
   const [loadingSalary, setLoadingSalary] = useState(false);
   const [profileData, setProfileData] = useState(null);
 
+  const fetchTodayStatus = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const data = await apiFetch('/attendance/today-status');
+      setTodayData(data);
+      lastSyncDateRef.current = new Date().toDateString();
+      setError('');
+    } catch (err) {
+      if (!silent) setError(err.message);
+      console.warn("Status fetch notice:", err.message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchTodayStatus();
+    fetchTodayStatus(false);
     fetchLeaveData();
     fetchProfile();
     fetchMyReimbursements();
 
+    // 1. Live ticking clock with automatic midnight date-rollover detection
     const timer = setInterval(() => {
-      setLiveTime(new Date());
+      const now = new Date();
+      setLiveTime(now);
+
+      // If midnight has passed and local date rolled over to a new day, auto-sync today's state
+      if (now.toDateString() !== lastSyncDateRef.current) {
+        lastSyncDateRef.current = now.toDateString();
+        fetchTodayStatus(true);
+      }
     }, 1000);
-    return () => clearInterval(timer);
+
+    // 2. Tab visibility & window focus handlers for mobile sleep/wake and tab switching
+    const handleTabResume = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTodayStatus(true);
+        fetchLeaveData();
+      }
+    };
+
+    const handleOnline = () => {
+      fetchTodayStatus(true);
+      setError('');
+    };
+
+    document.addEventListener('visibilitychange', handleTabResume);
+    window.addEventListener('focus', handleTabResume);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleTabResume);
+      window.removeEventListener('focus', handleTabResume);
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   const fetchProfile = async () => {
@@ -186,18 +234,6 @@ export default function Home() {
       fetchMyReimbursements();
     }
   }, [activePortalTab, salaryMonth]);
-
-  const fetchTodayStatus = async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch('/attendance/today-status');
-      setTodayData(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchLeaveData = async () => {
     try {
@@ -513,6 +549,13 @@ export default function Home() {
             style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '0.5rem 1rem' }}
           >
             <UserCheck size={16} /> Portal Dashboard
+          </button>
+          <button
+            onClick={() => setActivePortalTab('calendar')}
+            className={`apc-btn ${activePortalTab === 'calendar' ? 'apc-btn-primary' : 'apc-btn-secondary'}`}
+            style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '0.5rem 1rem' }}
+          >
+            <Calendar size={16} /> Attendance Calendar
           </button>
           <button
             onClick={() => setActivePortalTab('reimbursements')}
@@ -1164,6 +1207,11 @@ export default function Home() {
               </div>
             )}
           </div>
+        )}
+
+        {/* ATTENDANCE CALENDAR TAB VIEW */}
+        {activePortalTab === 'calendar' && (
+          <AttendanceCalendar user={user} currentRule={todayData?.rule} />
         )}
 
         {/* Apply Leave Modal */}

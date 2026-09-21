@@ -55,8 +55,9 @@ def get_dashboard_stats():
                 'photoUrl': r.punch_in_photo_url
             })
             
-    # 30-day trend chart data
-    start_30_days_ago = datetime.utcnow() - timedelta(days=30)
+    # 30-day trend chart data (IST timezone)
+    now_ist = get_current_now()
+    start_30_days_ago = now_ist - timedelta(days=30)
     start_date_str = start_30_days_ago.strftime('%Y-%m-%d')
     
     past_records = AttendanceRecord.query.filter(AttendanceRecord.date >= start_date_str).all()
@@ -64,7 +65,7 @@ def get_dashboard_stats():
     # Group by date
     trend_by_date = {}
     for i in range(30):
-        d_str = (datetime.utcnow() - timedelta(days=29 - i)).strftime('%Y-%m-%d')
+        d_str = (now_ist - timedelta(days=29 - i)).strftime('%Y-%m-%d')
         trend_by_date[d_str] = {'date': d_str, 'onTime': 0, 'late': 0, 'absent': 0, 'onLeave': 0}
         
     for r in past_records:
