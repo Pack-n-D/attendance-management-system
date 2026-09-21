@@ -269,10 +269,15 @@ def get_attendance_log():
     status = request.args.get('status', '').strip()
     start_date = request.args.get('startDate', '').strip()
     end_date = request.args.get('endDate', '').strip()
+    employee_id_param = request.args.get('employeeId', '').strip()
 
     query = AttendanceRecord.query.join(Employee)
 
-    if not is_admin:
+    if employee_id_param:
+        if not is_admin and employee_id_param != current_user_id:
+            return jsonify({'error': 'Unauthorized to view other employee logs'}), 403
+        query = query.filter(AttendanceRecord.employee_id == employee_id_param)
+    elif not is_admin:
         query = query.filter(AttendanceRecord.employee_id == current_user_id)
 
     if search and is_admin:

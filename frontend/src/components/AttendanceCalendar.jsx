@@ -11,7 +11,8 @@ import {
   MapPin,
   X,
   Info,
-  Coffee,
+  User,
+  Users,
   AlertTriangle
 } from 'lucide-react';
 
@@ -19,11 +20,18 @@ export default function AttendanceCalendar({ user, currentRule }) {
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed (0 = Jan, 8 = Sep)
+  
+  // Selected Employee (defaults to logged-in user)
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(user?.id || '');
+  const [employeeList, setEmployeeList] = useState([]);
+  
   const [records, setRecords] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDayDetail, setSelectedDayDetail] = useState(null);
+
+  const isAdmin = user?.role === 'super_admin';
 
   // Month Names
   const monthNames = [
@@ -33,14 +41,27 @@ export default function AttendanceCalendar({ user, currentRule }) {
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  // Load employee list for Admins
   useEffect(() => {
-    fetchMonthData(currentYear, currentMonth);
-  }, [currentYear, currentMonth]);
+    if (isAdmin) {
+      apiFetch('/admin/employees')
+        .then(res => {
+          if (res.employees) {
+            setEmployeeList(res.employees);
+          }
+        })
+        .catch(err => console.warn('Could not fetch employee list for calendar dropdown:', err));
+    }
+  }, [isAdmin]);
 
-  const fetchMonthData = async (year, month) => {
+  useEffect(() => {
+    fetchMonthData(currentYear, currentMonth, selectedEmployeeId || user?.id);
+  }, [currentYear, currentMonth, selectedEmployeeId]);
+
+  const fetchMonthData = async (year, month, targetEmpId) => {
     setLoading(true);
     try {
-      // Calculate start and end date for the month
+      const activeEmpId = targetEmpId || user?.id || '';
       const startDay = '01';
       const lastDate = new Date(year, month + 1, 0).getDate();
       const monthStr = String(month + 1).padStart(2, '0');
@@ -48,14 +69,21 @@ export default function AttendanceCalendar({ user, currentRule }) {
       const endDate = `${year}-${monthStr}-${String(lastDate).padStart(2, '0')}`;
 
       const [recRes, holRes, leaveRes] = await Promise.all([
-        apiFetch(`/attendance/log?startDate=${startDate}&endDate=${endDate}`).catch(() => ({ records: [] })),
+        apiFetch(`/attendance/log?startDate=${startDate}&endDate=${endDate}&employeeId=${activeEmpId}`).catch(() => ({ records: [] })),
         apiFetch('/settings/holidays').catch(() => ({ holidays: [] })),
         apiFetch('/employee/leave-requests').catch(() => ({ leaveRequests: [] }))
       ]);
 
-      setRecords(recRes.records || []);
+      // Filter records strictly for the active employee
+      const empRecords = (recRes.records || []).filter(r => !activeEmpId || r.employeeId === activeEmpId);
+      setRecords(empRecords);
       setHolidays(holRes.holidays || []);
-      setLeaveRequests((leaveRes.leaveRequests || []).filter(r => r.status === 'approved'));
+      
+      // Filter approved leaves for this employee
+      const empLeaves = (leaveRes.leaveRequests || []).filter(r => 
+        r.status === 'approved' && (!activeEmpId || r.employeeId === activeEmpId)
+      );
+      setLeaveRequests(empLeaves);
     } catch (err) {
       console.error('Failed to load month attendance data:', err);
     } finally {
@@ -109,6 +137,10 @@ export default function AttendanceCalendar({ user, currentRule }) {
         ? rawWeeklyOffs.split(',').map(w => w.trim().toLowerCase())
         : ['sunday']);
 
+  const activeEmpId = selectedEmployeeId || user?.id;
+  const activeEmpObj = employeeList.find(e => e.id === activeEmpId);
+  const activeEmpName = activeEmpObj ? `${activeEmpObj.firstName} ${activeEmpObj.lastName}` : (user?.fullName || user?.firstName || 'My Calendar');
+
   // Map data per day
   const dayDetailsMap = {};
   let presentCount = 0;
@@ -132,10 +164,10 @@ export default function AttendanceCalendar({ user, currentRule }) {
     // Check leave
     const leaveMatch = leaveRequests.find(l => dateStr >= l.startDate && dateStr <= l.endDate);
 
-    // Check record
-    const recordMatch = records.find(r => r.date === dateStr);
+    // Check record strictly for active employee
+    const recordMatch = records.find(r => r.date === dateStr && (!activeEmpId || r.employeeId === activeEmpId));
 
-    let type = 'future'; // 'present', 'late', 'leave', 'holiday', 'weekly_off', 'absent', 'future', 'not_punched_yet'
+    let type = 'future';
     let label = '';
     let bgColor = 'var(--apc-bg)';
     let borderColor = 'var(--apc-border)';
@@ -254,13 +286,42 @@ export default function AttendanceCalendar({ user, currentRule }) {
     <div className="apc-attendance-calendar-wrapper">
       {/* Calendar Header Card */}
       <div className="apc-card" style={{ marginBottom: '1.25rem', padding: '1.25rem' }}>
+        
+        {/* Admin Employee Selector Bar (Only shown for super_admin) */}
+        {isAdmin && employeeList.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem', background: 'var(--apc-bg)', borderRadius: '6px', border: '1px solid var(--apc-border)', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={16} color="var(--apc-primary)" />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Viewing Attendance For:</span>
+            </div>
+            <select
+              className="apc-select"
+              value={selectedEmployeeId}
+              onChange={(e) => setSelectedEmployeeId(e.target.value)}
+              style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem', minWidth: '220px' }}
+            >
+              <option value={user?.id}>👤 Me ({user?.fullName || user?.firstName} - Admin)</option>
+              {employeeList.filter(e => e.id !== user?.id).map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.firstName} {emp.lastName} ({emp.id}) · {emp.department}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Navigation Bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <CalendarIcon size={22} color="var(--apc-primary)" />
-            <h2 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 700 }}>
-              {monthNames[currentMonth]} {currentYear}
-            </h2>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 700 }}>
+                {monthNames[currentMonth]} {currentYear}
+              </h2>
+              <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>
+                Employee: <strong>{activeEmpName}</strong> ({activeEmpId})
+              </span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -573,7 +634,7 @@ export default function AttendanceCalendar({ user, currentRule }) {
                   })}
                 </h3>
                 <span style={{ fontSize: '0.82rem', color: 'var(--apc-text-secondary)' }}>
-                  Date: {selectedDayDetail.dateStr}
+                  Date: {selectedDayDetail.dateStr} · {activeEmpName} ({activeEmpId})
                 </span>
               </div>
               <button
