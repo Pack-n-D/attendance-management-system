@@ -246,11 +246,13 @@ def get_employee_detail(id):
 
     docs = [d.to_dict() for d in employee.documents]
     attendance_records = [a.to_dict() for a in AttendanceRecord.query.filter_by(employee_id=id).order_by(AttendanceRecord.date.desc()).all()]
+    rule = AttendanceRule.query.order_by(AttendanceRule.id.desc()).first()
 
     return jsonify({
         'employee': employee.to_dict(),
         'documents': docs,
-        'attendanceLogs': attendance_records
+        'attendanceLogs': attendance_records,
+        'rule': rule.to_dict() if rule else None
     }), 200
 
 

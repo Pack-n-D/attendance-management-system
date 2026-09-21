@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
 import Avatar from '../../components/Avatar';
+import AttendanceCalendar from '../../components/AttendanceCalendar';
 import { apiFetch, exportAttendanceCSV } from '../../utils/api';
 import { DEPARTMENTS } from '../../utils/constants';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -245,9 +246,10 @@ export default function EmployeeProfile() {
         <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--apc-border)', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           {[
             { id: 'overview', label: 'Overview', icon: User },
+            { id: 'calendar', label: 'Attendance Calendar', icon: Calendar },
+            { id: 'attendance', label: 'Attendance Table Log', icon: FileText },
             { id: 'payroll', label: 'Payroll & Salary Slips', icon: FileText },
             { id: 'documents', label: 'Documents', icon: FileText },
-            { id: 'attendance', label: 'Attendance Log', icon: Calendar },
             { id: 'account', label: 'Account & Security', icon: Key }
           ].map(t => {
             const IconComponent = t.icon;
@@ -704,7 +706,20 @@ export default function EmployeeProfile() {
           </div>
         )}
 
-        {/* TAB 3: ATTENDANCE LOG */}
+        {/* TAB: ATTENDANCE CALENDAR */}
+        {tab === 'calendar' && emp && (
+          <AttendanceCalendar
+            user={{
+              id: emp.id,
+              fullName: `${emp.firstName} ${emp.lastName}`,
+              firstName: emp.firstName,
+              role: 'employee'
+            }}
+            currentRule={data?.rule}
+          />
+        )}
+
+        {/* TAB 3: ATTENDANCE LOG TABLE */}
         {tab === 'attendance' && (
           <div className="apc-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
