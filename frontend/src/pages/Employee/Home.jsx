@@ -623,13 +623,13 @@ export default function Home() {
           }}
         >
           <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--apc-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-            <Clock size={15} color="var(--apc-primary-dark)" /> LIVE SYSTEM TIME (IST)
+            <Clock size={15} color="var(--apc-primary-dark)" /> LIVE SYSTEM TIME (MAHARASHTRA / IST)
           </div>
           <div style={{ fontSize: '2.1rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--apc-text-primary)', marginTop: '0.2rem' }}>
-            {liveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+            {liveTime.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
           </div>
           <div style={{ fontSize: '0.82rem', color: 'var(--apc-text-secondary)', marginTop: '0.1rem' }}>
-            {liveTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {liveTime.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
         </div>
 
@@ -1417,7 +1417,7 @@ export default function Home() {
                   {punchType === 'in' ? 'Punch In Verification' : 'Punch Out Verification'}
                 </h3>
                 <span style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', background: 'var(--apc-surface)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--apc-border)' }}>
-                  {liveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                  {liveTime.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                 </span>
               </div>
 
