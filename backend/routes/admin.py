@@ -791,6 +791,153 @@ def review_reimbursement(id):
     }), 200
 
 
+# --- ATTENDANCE OVERRIDE & MANAGEMENT ---
+@admin_bp.route('/attendance/override', methods=['POST'])
+def override_attendance_record():
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    data = request.get_json() or {}
+    employee_id = data.get('employeeId', '').strip()
+    date_str = data.get('date', '').strip()
+    status = data.get('status', '').strip()
+    punch_in_time = data.get('punchInTime', '').strip() or None
+    punch_out_time = data.get('punchOutTime', '').strip() or None
+    shift_type = data.get('shiftType', 'full_day') or 'full_day'
+    reason = data.get('reason', '').strip() or data.get('adminRemarks', '').strip()
+
+    if not employee_id or not date_str:
+        return jsonify({'error': 'Employee ID and date are required'}), 400
+
+    employee = Employee.query.get(employee_id)
+    if not employee:
+        return jsonify({'error': f'Employee {employee_id} not found'}), 404
+
+    # Format times if HH:MM
+    if punch_in_time and len(punch_in_time) == 5:
+        punch_in_time = f"{punch_in_time}:00"
+    if punch_out_time and len(punch_out_time) == 5:
+        punch_out_time = f"{punch_out_time}:00"
+
+    # If action is to clear/reset record
+    if status == 'clear':
+        existing = AttendanceRecord.query.filter_by(employee_id=employee_id, date=date_str).first()
+        if existing:
+            db.session.delete(existing)
+            db.session.commit()
+            log_audit(
+                admin_id,
+                admin_name,
+                f"Cleared / Reset Attendance Record for {employee.first_name} {employee.last_name} ({employee_id}) on {date_str}",
+                "AttendanceRecord",
+                f"{employee_id}_{date_str}"
+            )
+        return jsonify({
+            'message': f"Attendance record cleared for {employee.first_name} on {date_str}.",
+            'cleared': True,
+            'date': date_str,
+            'employeeId': employee_id
+        }), 200
+
+    valid_statuses = ['on_time', 'in_buffer', 'late', 'half_day', 'on_leave', 'absent']
+    if status not in valid_statuses:
+        return jsonify({'error': f"Invalid status '{status}'. Must be one of {valid_statuses} or 'clear'"}), 400
+
+    existing = AttendanceRecord.query.filter_by(employee_id=employee_id, date=date_str).first()
+
+    if existing:
+        existing.status = status
+        existing.shift_type = shift_type
+
+        # Only update punch times if explicitly provided, or fill defaults only when previously empty
+        if punch_in_time:
+            existing.punch_in_time = punch_in_time
+        elif not existing.punch_in_time and status in ['on_time', 'in_buffer', 'late', 'half_day']:
+            existing.punch_in_time = '10:00:00'
+
+        if punch_out_time:
+            existing.punch_out_time = punch_out_time
+        elif not existing.punch_out_time and status in ['on_time', 'in_buffer', 'late', 'half_day']:
+            existing.punch_out_time = '18:30:00'
+
+        # Preserve existing punch locations if already set
+        if not existing.punch_in_location:
+            existing.punch_in_location = 'Admin Manual Override'
+        if not existing.punch_out_location and existing.punch_out_time:
+            existing.punch_out_location = 'Admin Manual Override'
+
+        if reason:
+            existing.late_reason = reason
+        existing.is_manual_override = True
+        existing.admin_override_by = admin_name
+        existing.admin_override_at = datetime.utcnow()
+        existing.admin_override_reason = reason or "Admin Manual Adjustment"
+        record = existing
+    else:
+        default_in = '10:00:00' if status in ['on_time', 'in_buffer'] else ('10:45:00' if status == 'late' else ('13:00:00' if status == 'half_day' else None))
+        default_out = '18:30:00' if status in ['on_time', 'in_buffer', 'late', 'half_day'] else None
+
+        record = AttendanceRecord(
+            employee_id=employee_id,
+            date=date_str,
+            punch_in_time=punch_in_time or default_in,
+            punch_out_time=punch_out_time or default_out,
+            punch_in_location='Admin Manual Override',
+            punch_out_location='Admin Manual Override' if (punch_out_time or default_out) else None,
+            status=status,
+            shift_type=shift_type,
+            late_reason=reason,
+            is_manual_override=True,
+            admin_override_by=admin_name,
+            admin_override_at=datetime.utcnow(),
+            admin_override_reason=reason or "Admin Manual Adjustment"
+        )
+        db.session.add(record)
+
+    db.session.commit()
+
+    log_audit(
+        admin_id,
+        admin_name,
+        f"Admin Override Attendance for {employee.first_name} {employee.last_name} ({employee_id}) on {date_str} to '{status}'. Reason: {reason or 'Manual Adjustment'}",
+        "AttendanceRecord",
+        f"{employee_id}_{date_str}"
+    )
+
+    return jsonify({
+        'message': f"Attendance successfully updated to {status.replace('_', ' ').title()} for {employee.first_name} {employee.last_name} on {date_str}.",
+        'record': record.to_dict()
+    }), 200
+
+
+@admin_bp.route('/attendance/override', methods=['DELETE'])
+def delete_attendance_override():
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    employee_id = request.args.get('employeeId', '').strip()
+    date_str = request.args.get('date', '').strip()
+
+    if not employee_id or not date_str:
+        return jsonify({'error': 'employeeId and date query parameters are required'}), 400
+
+    existing = AttendanceRecord.query.filter_by(employee_id=employee_id, date=date_str).first()
+    if existing:
+        db.session.delete(existing)
+        db.session.commit()
+        log_audit(
+            admin_id,
+            admin_name,
+            f"Deleted Attendance Record for Employee {employee_id} on {date_str}",
+            "AttendanceRecord",
+            f"{employee_id}_{date_str}"
+        )
+
+    return jsonify({'message': f'Attendance record for {employee_id} on {date_str} removed successfully.'}), 200
+
+
 # --- SYSTEM RESET ---
 @admin_bp.route('/reset-database', methods=['POST'])
 def reset_database():

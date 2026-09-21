@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch, getPhotoUrl } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import StatusBadge from './StatusBadge';
 import {
   ChevronLeft,
@@ -13,16 +14,26 @@ import {
   Info,
   User,
   Users,
-  AlertTriangle
+  AlertTriangle,
+  Edit3,
+  Save,
+  Check,
+  Trash2,
+  Sparkles,
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
 
 export default function AttendanceCalendar({ user, currentRule }) {
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === 'super_admin' || user?.role === 'super_admin';
+
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed (0 = Jan, 8 = Sep)
   
-  // Selected Employee (defaults to logged-in user)
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(user?.id || '');
+  // Selected Employee (defaults to passed user or logged-in user)
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(user?.id || authUser?.id || '');
   const [employeeList, setEmployeeList] = useState([]);
   
   const [records, setRecords] = useState([]);
@@ -31,7 +42,15 @@ export default function AttendanceCalendar({ user, currentRule }) {
   const [loading, setLoading] = useState(true);
   const [selectedDayDetail, setSelectedDayDetail] = useState(null);
 
-  const isAdmin = user?.role === 'super_admin';
+  // Admin Override Editor State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editStatus, setEditStatus] = useState('on_time');
+  const [editPunchIn, setEditPunchIn] = useState('10:00');
+  const [editPunchOut, setEditPunchOut] = useState('18:30');
+  const [editShiftType, setEditShiftType] = useState('full_day');
+  const [editReason, setEditReason] = useState('');
+  const [savingOverride, setSavingOverride] = useState(false);
+  const [overrideFeedback, setOverrideFeedback] = useState(null);
 
   // Month Names
   const monthNames = [
@@ -40,6 +59,13 @@ export default function AttendanceCalendar({ user, currentRule }) {
   ];
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  // Keep selectedEmployeeId updated if user prop changes
+  useEffect(() => {
+    if (user?.id && user.id !== selectedEmployeeId) {
+      setSelectedEmployeeId(user.id);
+    }
+  }, [user?.id]);
 
   // Load employee list for Admins
   useEffect(() => {
@@ -55,13 +81,13 @@ export default function AttendanceCalendar({ user, currentRule }) {
   }, [isAdmin]);
 
   useEffect(() => {
-    fetchMonthData(currentYear, currentMonth, selectedEmployeeId || user?.id);
+    fetchMonthData(currentYear, currentMonth, selectedEmployeeId || user?.id || authUser?.id);
   }, [currentYear, currentMonth, selectedEmployeeId]);
 
   const fetchMonthData = async (year, month, targetEmpId) => {
     setLoading(true);
     try {
-      const activeEmpId = targetEmpId || user?.id || '';
+      const activeEmpId = targetEmpId || user?.id || authUser?.id || '';
       const startDay = '01';
       const lastDate = new Date(year, month + 1, 0).getDate();
       const monthStr = String(month + 1).padStart(2, '0');
@@ -137,9 +163,11 @@ export default function AttendanceCalendar({ user, currentRule }) {
         ? rawWeeklyOffs.split(',').map(w => w.trim().toLowerCase())
         : ['sunday']);
 
-  const activeEmpId = selectedEmployeeId || user?.id;
+  const activeEmpId = selectedEmployeeId || user?.id || authUser?.id;
   const activeEmpObj = employeeList.find(e => e.id === activeEmpId);
-  const activeEmpName = activeEmpObj ? `${activeEmpObj.firstName} ${activeEmpObj.lastName}` : (user?.fullName || user?.firstName || 'My Calendar');
+  const activeEmpName = activeEmpObj 
+    ? `${activeEmpObj.firstName} ${activeEmpObj.lastName}` 
+    : (user?.fullName || user?.firstName || authUser?.fullName || authUser?.firstName || 'My Calendar');
 
   // Map data per day
   const dayDetailsMap = {};
@@ -182,7 +210,7 @@ export default function AttendanceCalendar({ user, currentRule }) {
         bgColor = '#DCFCE7'; // Light Green
         borderColor = '#86EFAC';
         textColor = '#14532D';
-        badgeText = 'On Time';
+        badgeText = st === 'in_buffer' ? 'In Buffer' : 'On Time';
         presentCount++;
       } else if (st === 'late' || st === 'half_day') {
         type = 'late';
@@ -200,6 +228,14 @@ export default function AttendanceCalendar({ user, currentRule }) {
         textColor = '#3730A3';
         badgeText = 'Leave';
         leaveCount++;
+      } else if (st === 'absent') {
+        type = 'absent';
+        label = 'Absent';
+        bgColor = '#FEE2E2'; // Light Red
+        borderColor = '#FCA5A5';
+        textColor = '#7F1D1D';
+        badgeText = 'Absent';
+        absentCount++;
       }
 
       // Calculate minutes worked if both punch in & out exist
@@ -282,26 +318,137 @@ export default function AttendanceCalendar({ user, currentRule }) {
 
   const totalHoursWorked = (totalMinutesWorked / 60).toFixed(1);
 
+  // Open Day Detail and initialize editor state
+  const handleOpenDayModal = (info) => {
+    setSelectedDayDetail(info);
+    setIsEditing(false);
+    setOverrideFeedback(null);
+
+    if (info.record) {
+      setEditStatus(info.record.status || 'on_time');
+      setEditPunchIn(info.record.punchInTime ? info.record.punchInTime.slice(0, 5) : '10:00');
+      setEditPunchOut(info.record.punchOutTime ? info.record.punchOutTime.slice(0, 5) : '18:30');
+      setEditShiftType(info.record.shiftType || 'full_day');
+      setEditReason(info.record.adminOverrideReason || info.record.lateReason || '');
+    } else if (info.type === 'absent') {
+      setEditStatus('on_time');
+      setEditPunchIn('10:00');
+      setEditPunchOut('18:30');
+      setEditShiftType('full_day');
+      setEditReason('Forgot punch / System downtime - Admin manual approval');
+    } else {
+      setEditStatus('on_time');
+      setEditPunchIn('10:00');
+      setEditPunchOut('18:30');
+      setEditShiftType('full_day');
+      setEditReason('');
+    }
+  };
+
+  // 1-Click Quick Override action for Admin
+  const handleQuickOverride = async (statusPreset, defaultIn, defaultOut, defaultShift, defaultReason) => {
+    if (!activeEmpId || !selectedDayDetail) return;
+    setSavingOverride(true);
+    setOverrideFeedback(null);
+    try {
+      const res = await apiFetch('/admin/attendance/override', {
+        method: 'POST',
+        body: JSON.stringify({
+          employeeId: activeEmpId,
+          date: selectedDayDetail.dateStr,
+          status: statusPreset,
+          punchInTime: defaultIn,
+          punchOutTime: defaultOut,
+          shiftType: defaultShift || 'full_day',
+          reason: defaultReason || `Admin manual override to ${statusPreset}`
+        })
+      });
+
+      setOverrideFeedback({ type: 'success', text: res.message || 'Updated successfully!' });
+      await fetchMonthData(currentYear, currentMonth, activeEmpId);
+
+      if (res.record) {
+        setSelectedDayDetail(prev => ({
+          ...prev,
+          type: statusPreset === 'on_time' || statusPreset === 'in_buffer' ? 'present' : (statusPreset === 'late' || statusPreset === 'half_day' ? 'late' : statusPreset),
+          record: res.record,
+          badgeText: statusPreset.replace('_', ' ').toUpperCase()
+        }));
+      } else if (statusPreset === 'clear') {
+        setSelectedDayDetail(null);
+      }
+      setIsEditing(false);
+    } catch (err) {
+      setOverrideFeedback({ type: 'error', text: err.message || 'Failed to update attendance' });
+    } finally {
+      setSavingOverride(false);
+    }
+  };
+
+  // Custom Form Save
+  const handleSaveCustomOverride = async (e) => {
+    if (e) e.preventDefault();
+    if (!activeEmpId || !selectedDayDetail) return;
+    setSavingOverride(true);
+    setOverrideFeedback(null);
+
+    const isNoPunchStatus = editStatus === 'absent' || editStatus === 'on_leave' || editStatus === 'clear';
+
+    try {
+      const res = await apiFetch('/admin/attendance/override', {
+        method: 'POST',
+        body: JSON.stringify({
+          employeeId: activeEmpId,
+          date: selectedDayDetail.dateStr,
+          status: editStatus,
+          punchInTime: isNoPunchStatus ? null : editPunchIn,
+          punchOutTime: isNoPunchStatus ? null : editPunchOut,
+          shiftType: editShiftType,
+          reason: editReason || 'Admin Manual Override'
+        })
+      });
+
+      setOverrideFeedback({ type: 'success', text: res.message || 'Saved successfully!' });
+      await fetchMonthData(currentYear, currentMonth, activeEmpId);
+
+      if (res.record) {
+        setSelectedDayDetail(prev => ({
+          ...prev,
+          type: editStatus === 'on_time' || editStatus === 'in_buffer' ? 'present' : (editStatus === 'late' || editStatus === 'half_day' ? 'late' : editStatus),
+          record: res.record,
+          badgeText: editStatus.replace('_', ' ').toUpperCase()
+        }));
+      } else if (editStatus === 'clear') {
+        setSelectedDayDetail(null);
+      }
+      setIsEditing(false);
+    } catch (err) {
+      setOverrideFeedback({ type: 'error', text: err.message || 'Failed to save changes' });
+    } finally {
+      setSavingOverride(false);
+    }
+  };
+
   return (
     <div className="apc-attendance-calendar-wrapper">
       {/* Calendar Header Card */}
       <div className="apc-card" style={{ marginBottom: '1.25rem', padding: '1.25rem' }}>
         
-        {/* Admin Employee Selector Bar (Only shown for super_admin) */}
+        {/* Admin Employee Selector Bar (Shown for super_admin) */}
         {isAdmin && employeeList.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem', background: 'var(--apc-bg)', borderRadius: '6px', border: '1px solid var(--apc-border)', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Users size={16} color="var(--apc-primary)" />
-              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Viewing Attendance For:</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Viewing Attendance Calendar For:</span>
             </div>
             <select
               className="apc-select"
               value={selectedEmployeeId}
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
-              style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem', minWidth: '220px' }}
+              style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem', minWidth: '240px' }}
             >
-              <option value={user?.id}>👤 Me ({user?.fullName || user?.firstName} - Admin)</option>
-              {employeeList.filter(e => e.id !== user?.id).map(emp => (
+              <option value={authUser?.id}>👤 Me ({authUser?.fullName || authUser?.firstName} - Admin)</option>
+              {employeeList.filter(e => e.id !== authUser?.id).map(emp => (
                 <option key={emp.id} value={emp.id}>
                   {emp.firstName} {emp.lastName} ({emp.id}) · {emp.department}
                 </option>
@@ -320,6 +467,11 @@ export default function AttendanceCalendar({ user, currentRule }) {
               </h2>
               <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>
                 Employee: <strong>{activeEmpName}</strong> ({activeEmpId})
+                {isAdmin && (
+                  <span style={{ marginLeft: '8px', color: 'var(--apc-primary-dark)', fontWeight: 600, background: 'rgba(245, 166, 35, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                    Admin Edit Enabled ✏️ (Click any day to change status)
+                  </span>
+                )}
               </span>
             </div>
           </div>
@@ -421,6 +573,12 @@ export default function AttendanceCalendar({ user, currentRule }) {
             <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#FEE2E2', border: '1px solid #FCA5A5', display: 'inline-block' }}></span>
             <span>Absent (Light Red)</span>
           </div>
+          {isAdmin && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: 'auto', color: 'var(--apc-primary-dark)', fontWeight: 600 }}>
+              <Edit3 size={12} />
+              <span>Admin: Click any day to edit status</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -428,7 +586,8 @@ export default function AttendanceCalendar({ user, currentRule }) {
       <div className="apc-card" style={{ padding: '1rem', overflowX: 'auto' }}>
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--apc-text-secondary)' }}>
-            Loading {monthNames[currentMonth]} {currentYear} attendance records...
+            <RefreshCw size={24} className="spin" style={{ marginBottom: '8px', display: 'inline-block' }} />
+            <div>Loading {monthNames[currentMonth]} {currentYear} attendance records...</div>
           </div>
         ) : (
           <div style={{ minWidth: '600px' }}>
@@ -472,12 +631,13 @@ export default function AttendanceCalendar({ user, currentRule }) {
                 const info = dayDetailsMap[dayNum];
                 if (!info) return null;
 
-                const isClickable = info.record || info.leave || info.holiday || info.type === 'absent' || info.isToday;
+                const isClickable = isAdmin || info.record || info.leave || info.holiday || info.type === 'absent' || info.isToday;
+                const isManuallyOverridden = info.record?.isManualOverride;
 
                 return (
                   <div
                     key={`day-${dayNum}`}
-                    onClick={() => isClickable && setSelectedDayDetail(info)}
+                    onClick={() => isClickable && handleOpenDayModal(info)}
                     style={{
                       minHeight: '85px',
                       padding: '0.5rem 0.45rem',
@@ -505,7 +665,7 @@ export default function AttendanceCalendar({ user, currentRule }) {
                       }
                     }}
                   >
-                    {/* Day Number & Today Tag */}
+                    {/* Day Number, Today Tag & Override Indicator */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span
                         style={{
@@ -516,21 +676,46 @@ export default function AttendanceCalendar({ user, currentRule }) {
                       >
                         {dayNum}
                       </span>
-                      {info.isToday && (
-                        <span
-                          style={{
-                            background: '#F59E0B',
-                            color: '#FFFFFF',
-                            fontSize: '0.62rem',
-                            fontWeight: 700,
-                            padding: '1px 5px',
-                            borderRadius: '4px',
-                            textTransform: 'uppercase'
-                          }}
-                        >
-                          Today
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        {isManuallyOverridden && (
+                          <span
+                            title={`Admin Override: ${info.record.adminOverrideReason || 'Manual adjustment'}`}
+                            style={{
+                              background: '#3B82F6',
+                              color: '#FFFFFF',
+                              fontSize: '0.58rem',
+                              fontWeight: 700,
+                              padding: '1px 4px',
+                              borderRadius: '3px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '2px'
+                            }}
+                          >
+                            <ShieldCheck size={9} /> Override
+                          </span>
+                        )}
+                        {info.isToday && (
+                          <span
+                            style={{
+                              background: '#F59E0B',
+                              color: '#FFFFFF',
+                              fontSize: '0.62rem',
+                              fontWeight: 700,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            Today
+                          </span>
+                        )}
+                        {isAdmin && (
+                          <span className="admin-edit-hint" style={{ opacity: 0.5, fontSize: '0.65rem' }}>
+                            <Edit3 size={11} color={info.textColor} />
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Status Content */}
@@ -541,9 +726,9 @@ export default function AttendanceCalendar({ user, currentRule }) {
                             ✓ {info.badgeText}
                           </span>
                           <span style={{ color: '#166534', fontSize: '0.68rem', display: 'block' }}>
-                            In: {info.record.punchInTime?.slice(0, 5)}
+                            In: {info.record?.punchInTime?.slice(0, 5) || '10:00'}
                           </span>
-                          {info.record.punchOutTime && (
+                          {info.record?.punchOutTime && (
                             <span style={{ color: '#166534', fontSize: '0.68rem', display: 'block' }}>
                               Out: {info.record.punchOutTime?.slice(0, 5)}
                             </span>
@@ -557,9 +742,9 @@ export default function AttendanceCalendar({ user, currentRule }) {
                             ⚠️ {info.badgeText}
                           </span>
                           <span style={{ color: '#92400E', fontSize: '0.68rem', display: 'block' }}>
-                            In: {info.record.punchInTime?.slice(0, 5)}
+                            In: {info.record?.punchInTime?.slice(0, 5) || '10:45'}
                           </span>
-                          {info.record.punchOutTime && (
+                          {info.record?.punchOutTime && (
                             <span style={{ color: '#92400E', fontSize: '0.68rem', display: 'block' }}>
                               Out: {info.record.punchOutTime?.slice(0, 5)}
                             </span>
@@ -615,15 +800,16 @@ export default function AttendanceCalendar({ user, currentRule }) {
         )}
       </div>
 
-      {/* DAY DETAIL POPUP MODAL */}
+      {/* DAY DETAIL & ADMIN OVERRIDE POPUP MODAL */}
       {selectedDayDetail && (
         <div className="apc-modal-overlay" onClick={() => setSelectedDayDetail(null)}>
           <div
             className="apc-modal"
-            style={{ maxWidth: '480px', width: '90%' }}
+            style={{ maxWidth: '540px', width: '92%', maxHeight: '90vh', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--apc-border)', paddingBottom: '0.75rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', margin: 0 }}>
                   {selectedDayDetail.dateObj.toLocaleDateString('en-US', {
@@ -634,7 +820,7 @@ export default function AttendanceCalendar({ user, currentRule }) {
                   })}
                 </h3>
                 <span style={{ fontSize: '0.82rem', color: 'var(--apc-text-secondary)' }}>
-                  Date: {selectedDayDetail.dateStr} · {activeEmpName} ({activeEmpId})
+                  Date: <strong>{selectedDayDetail.dateStr}</strong> · {activeEmpName} ({activeEmpId})
                 </span>
               </div>
               <button
@@ -646,7 +832,28 @@ export default function AttendanceCalendar({ user, currentRule }) {
               </button>
             </div>
 
-            {/* Status overview */}
+            {/* Feedback Alert if any */}
+            {overrideFeedback && (
+              <div
+                style={{
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  marginBottom: '1rem',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  background: overrideFeedback.type === 'success' ? '#DCFCE7' : '#FEE2E2',
+                  border: `1px solid ${overrideFeedback.type === 'success' ? '#86EFAC' : '#FCA5A5'}`,
+                  color: overrideFeedback.type === 'success' ? '#14532D' : '#7F1D1D'
+                }}
+              >
+                {overrideFeedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                <span>{overrideFeedback.text}</span>
+              </div>
+            )}
+
+            {/* Current Status overview */}
             <div
               style={{
                 padding: '0.85rem',
@@ -661,9 +868,9 @@ export default function AttendanceCalendar({ user, currentRule }) {
             >
               <div>
                 <span style={{ fontSize: '0.78rem', color: selectedDayDetail.textColor, textTransform: 'uppercase', fontWeight: 600 }}>
-                  ATTENDANCE STATUS
+                  CURRENT ATTENDANCE STATUS
                 </span>
-                <h4 style={{ margin: '2px 0 0 0', color: selectedDayDetail.textColor, fontSize: '1.1rem' }}>
+                <h4 style={{ margin: '2px 0 0 0', color: selectedDayDetail.textColor, fontSize: '1.15rem' }}>
                   {selectedDayDetail.badgeText || selectedDayDetail.label || 'No Record'}
                 </h4>
               </div>
@@ -672,7 +879,231 @@ export default function AttendanceCalendar({ user, currentRule }) {
               )}
             </div>
 
-            {/* Detailed Info */}
+            {/* Admin Override Alert Notification */}
+            {selectedDayDetail.record?.isManualOverride && (
+              <div style={{ padding: '0.75rem', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem', color: '#1E40AF' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, marginBottom: '2px' }}>
+                  <ShieldCheck size={16} color="#2563EB" />
+                  <span>Admin Manual Override Applied</span>
+                </div>
+                <p style={{ margin: '2px 0 0 0' }}>
+                  <strong>Modified by:</strong> {selectedDayDetail.record.adminOverrideBy || 'Super Admin'}
+                  {selectedDayDetail.record.adminOverrideAt ? ` on ${new Date(selectedDayDetail.record.adminOverrideAt).toLocaleDateString()}` : ''}
+                </p>
+                {selectedDayDetail.record.adminOverrideReason && (
+                  <p style={{ margin: '4px 0 0 0', color: '#1D4ED8' }}>
+                    <strong>Note:</strong> {selectedDayDetail.record.adminOverrideReason}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ADMIN ACTIONS & OVERRIDE PANEL (Only for Super Admin) */}
+            {isAdmin && (
+              <div style={{ marginBottom: '1.25rem', padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: '8px', border: '1px solid var(--apc-primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Edit3 size={16} color="var(--apc-primary)" />
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--apc-text-primary)' }}>
+                      Admin Override & Corrections
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="apc-btn apc-btn-secondary"
+                    style={{ fontSize: '0.78rem', padding: '0.25rem 0.6rem' }}
+                  >
+                    {isEditing ? 'Hide Custom Editor' : 'Custom Times / Details'}
+                  </button>
+                </div>
+
+                {/* 1-Click Quick Presets */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: isEditing ? '0.85rem' : '0' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', fontWeight: 600 }}>1-CLICK QUICK OVERRIDE PRESETS:</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.45rem' }}>
+                    
+                    {/* Mark Present */}
+                    <button
+                      type="button"
+                      disabled={savingOverride}
+                      onClick={() => handleQuickOverride('on_time', '10:00:00', '18:30:00', 'full_day', 'Marked Present by Admin')}
+                      className="apc-btn"
+                      style={{ background: '#DCFCE7', color: '#14532D', border: '1px solid #86EFAC', padding: '0.4rem 0.5rem', fontSize: '0.78rem', fontWeight: 700, justifyContent: 'center' }}
+                    >
+                      <Check size={14} /> Mark Present (Full)
+                    </button>
+
+                    {/* Mark Late */}
+                    <button
+                      type="button"
+                      disabled={savingOverride}
+                      onClick={() => handleQuickOverride('late', '10:45:00', '18:30:00', 'full_day', 'Marked Late by Admin')}
+                      className="apc-btn"
+                      style={{ background: '#FEF3C7', color: '#78350F', border: '1px solid #FCD34D', padding: '0.4rem 0.5rem', fontSize: '0.78rem', fontWeight: 700, justifyContent: 'center' }}
+                    >
+                      <Clock size={14} /> Mark Late
+                    </button>
+
+                    {/* Mark Half Day */}
+                    <button
+                      type="button"
+                      disabled={savingOverride}
+                      onClick={() => handleQuickOverride('half_day', '13:00:00', '18:30:00', 'second_half', 'Marked Half Day by Admin')}
+                      className="apc-btn"
+                      style={{ background: '#FFEDD5', color: '#9A3412', border: '1px solid #FDBA74', padding: '0.4rem 0.5rem', fontSize: '0.78rem', fontWeight: 700, justifyContent: 'center' }}
+                    >
+                      <Clock size={14} /> Mark Half Day
+                    </button>
+
+                    {/* Mark Leave */}
+                    <button
+                      type="button"
+                      disabled={savingOverride}
+                      onClick={() => handleQuickOverride('on_leave', null, null, 'full_day', 'Approved Leave by Admin')}
+                      className="apc-btn"
+                      style={{ background: '#E0E7FF', color: '#3730A3', border: '1px solid #A5B4FC', padding: '0.4rem 0.5rem', fontSize: '0.78rem', fontWeight: 700, justifyContent: 'center' }}
+                    >
+                      🏖️ Mark Leave
+                    </button>
+
+                    {/* Mark Absent */}
+                    <button
+                      type="button"
+                      disabled={savingOverride}
+                      onClick={() => handleQuickOverride('absent', null, null, 'full_day', 'Marked Absent by Admin')}
+                      className="apc-btn"
+                      style={{ background: '#FEE2E2', color: '#7F1D1D', border: '1px solid #FCA5A5', padding: '0.4rem 0.5rem', fontSize: '0.78rem', fontWeight: 700, justifyContent: 'center' }}
+                    >
+                      ✕ Mark Absent
+                    </button>
+
+                    {/* Clear / Reset */}
+                    {selectedDayDetail.record && (
+                      <button
+                        type="button"
+                        disabled={savingOverride}
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to clear/reset this attendance record?')) {
+                            handleQuickOverride('clear', null, null, 'full_day', 'Record cleared by Admin');
+                          }
+                        }}
+                        className="apc-btn apc-btn-secondary"
+                        style={{ padding: '0.4rem 0.5rem', fontSize: '0.78rem', justifyContent: 'center', color: 'var(--apc-danger)' }}
+                      >
+                        <Trash2 size={13} /> Clear Record
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Detailed Custom Editor Form */}
+                {isEditing && (
+                  <form onSubmit={handleSaveCustomOverride} style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px dashed var(--apc-border)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.65rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '3px' }}>
+                          Status
+                        </label>
+                        <select
+                          className="apc-select"
+                          value={editStatus}
+                          onChange={(e) => setEditStatus(e.target.value)}
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.82rem', width: '100%' }}
+                        >
+                          <option value="on_time">Present (On Time)</option>
+                          <option value="in_buffer">Present (In Buffer)</option>
+                          <option value="late">Late Arrival</option>
+                          <option value="half_day">Half Day / Second Half</option>
+                          <option value="on_leave">Approved Leave</option>
+                          <option value="absent">Absent / Unrecorded</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '3px' }}>
+                          Shift Type
+                        </label>
+                        <select
+                          className="apc-select"
+                          value={editShiftType}
+                          onChange={(e) => setEditShiftType(e.target.value)}
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.82rem', width: '100%' }}
+                        >
+                          <option value="full_day">Full Day</option>
+                          <option value="second_half">Second Half / Afternoon</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {editStatus !== 'absent' && editStatus !== 'on_leave' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.65rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '3px' }}>
+                            Punch In Time
+                          </label>
+                          <input
+                            type="time"
+                            className="apc-input"
+                            value={editPunchIn}
+                            onChange={(e) => setEditPunchIn(e.target.value)}
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '3px' }}>
+                            Punch Out Time
+                          </label>
+                          <input
+                            type="time"
+                            className="apc-input"
+                            value={editPunchOut}
+                            onChange={(e) => setEditPunchOut(e.target.value)}
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '0.82rem' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: '0.85rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '3px' }}>
+                        Admin Reason / Note
+                      </label>
+                      <input
+                        type="text"
+                        className="apc-input"
+                        placeholder="e.g. Employee forgot punch / System downtime / Client site duty"
+                        value={editReason}
+                        onChange={(e) => setEditReason(e.target.value)}
+                        style={{ padding: '0.35rem 0.65rem', fontSize: '0.82rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="apc-btn apc-btn-secondary"
+                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={savingOverride}
+                        className="apc-btn apc-btn-primary"
+                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.85rem' }}
+                      >
+                        <Save size={14} /> {savingOverride ? 'Saving...' : 'Save Override'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* Detailed Info for Regular Days */}
             {selectedDayDetail.record ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {/* Punch In Details */}
@@ -692,7 +1123,7 @@ export default function AttendanceCalendar({ user, currentRule }) {
                   )}
                   {selectedDayDetail.record.lateReason && (
                     <div style={{ marginTop: '6px', padding: '6px 8px', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '4px', fontSize: '0.8rem', color: '#92400E' }}>
-                      <strong>Late Reason:</strong> {selectedDayDetail.record.lateReason}
+                      <strong>Late Reason / Remarks:</strong> {selectedDayDetail.record.lateReason}
                     </div>
                   )}
                   {selectedDayDetail.record.punchInPhotoUrl && (
@@ -756,6 +1187,11 @@ export default function AttendanceCalendar({ user, currentRule }) {
                 <p style={{ margin: 0, fontSize: '0.88rem' }}>
                   No punch record or approved leave was logged for this regular working day.
                 </p>
+                {isAdmin && (
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', fontWeight: 600 }}>
+                    💡 Tip: Click "Mark Present (Full)" above to immediately convert this absence to Present.
+                  </p>
+                )}
               </div>
             ) : (
               <div style={{ padding: '0.85rem', background: 'var(--apc-bg)', borderRadius: '6px', border: '1px solid var(--apc-border)', color: 'var(--apc-text-secondary)', fontSize: '0.88rem' }}>

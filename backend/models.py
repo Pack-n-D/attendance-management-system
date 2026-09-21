@@ -112,6 +112,10 @@ class AttendanceRecord(db.Model):
     status = db.Column(db.String(20), nullable=False)  # 'on_time', 'in_buffer', 'late', 'absent', 'on_leave', 'half_day'
     shift_type = db.Column(db.String(20), nullable=False, default='full_day')  # 'full_day', 'second_half'
     late_reason = db.Column(db.Text, nullable=True)
+    is_manual_override = db.Column(db.Boolean, default=False)
+    admin_override_by = db.Column(db.String(100), nullable=True)
+    admin_override_at = db.Column(db.DateTime, nullable=True)
+    admin_override_reason = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __init__(self, **kwargs):
@@ -133,7 +137,11 @@ class AttendanceRecord(db.Model):
             'punchOutLocation': getattr(self, 'punch_out_location', None),
             'status': self.status,
             'shiftType': getattr(self, 'shift_type', 'full_day') or 'full_day',
-            'lateReason': self.late_reason
+            'lateReason': self.late_reason,
+            'isManualOverride': bool(getattr(self, 'is_manual_override', False)),
+            'adminOverrideBy': getattr(self, 'admin_override_by', None),
+            'adminOverrideAt': self.admin_override_at.isoformat() if getattr(self, 'admin_override_at', None) else None,
+            'adminOverrideReason': getattr(self, 'admin_override_reason', None)
         }
 
 
