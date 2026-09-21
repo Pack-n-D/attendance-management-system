@@ -5,7 +5,7 @@ import AttendanceCalendar from '../../components/AttendanceCalendar';
 import { apiFetch } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { DEFAULT_OFFICE_CONFIG, calculateDistanceMeters } from '../../utils/constants';
-import { Camera, CheckCircle2, Clock, MapPin, AlertTriangle, RefreshCw, Send, Calendar, UserCheck, Check, X, FileText, Receipt, Plus, Trash2, DollarSign, Image } from 'lucide-react';
+import { Camera, CheckCircle2, Clock, MapPin, AlertTriangle, RefreshCw, Send, Calendar, UserCheck, Check, X, FileText, Receipt, Plus, Trash2, DollarSign, Image, Home as HomeIcon, Laptop } from 'lucide-react';
 
 export default function Home() {
   const { user } = useAuth();
@@ -47,6 +47,23 @@ export default function Home() {
   const [withdrawModalReq, setWithdrawModalReq] = useState(null);
   const [withdrawReason, setWithdrawReason] = useState('');
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+
+  // Work From Home (WFH) Management state
+  const [showWfhModal, setShowWfhModal] = useState(false);
+  const [wfhStartDate, setWfhStartDate] = useState('');
+  const [wfhEndDate, setWfhEndDate] = useState('');
+  const [wfhReason, setWfhReason] = useState('');
+  const [submittingWfh, setSubmittingWfh] = useState(false);
+  const [wfhMsg, setWfhMsg] = useState('');
+
+  const [myWfhRequests, setMyWfhRequests] = useState([]);
+  const [managedWfhRequests, setManagedWfhRequests] = useState([]);
+  const [reviewingWfhId, setReviewingWfhId] = useState(null);
+
+  // WFH Withdrawal state
+  const [withdrawWfhModalReq, setWithdrawWfhModalReq] = useState(null);
+  const [withdrawWfhReason, setWithdrawWfhReason] = useState('');
+  const [submittingWfhWithdraw, setSubmittingWfhWithdraw] = useState(false);
 
   // Reimbursement State
   const [myReimbursements, setMyReimbursements] = useState([]);
@@ -237,12 +254,16 @@ export default function Home() {
 
   const fetchLeaveData = async () => {
     try {
-      const [myRes, managedRes] = await Promise.all([
+      const [myRes, managedRes, myWfhRes, managedWfhRes] = await Promise.all([
         apiFetch('/employee/leave-requests').catch(() => ({ leaveRequests: [] })),
-        apiFetch('/employee/managed-leave-requests').catch(() => ({ leaveRequests: [] }))
+        apiFetch('/employee/managed-leave-requests').catch(() => ({ leaveRequests: [] })),
+        apiFetch('/employee/wfh-requests').catch(() => ({ wfhRequests: [] })),
+        apiFetch('/employee/managed-wfh-requests').catch(() => ({ wfhRequests: [] }))
       ]);
       setMyLeaveRequests(myRes.leaveRequests || []);
       setManagedRequests(managedRes.leaveRequests || []);
+      setMyWfhRequests(myWfhRes.wfhRequests || []);
+      setManagedWfhRequests(managedWfhRes.wfhRequests || []);
     } catch (err) {
       console.error(err);
     }
@@ -368,15 +389,16 @@ export default function Home() {
 
     try {
       const isGeoEnabled = todayData?.rule?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled;
-      const radiusLimit = Math.round(todayData?.rule?.allowedRadiusMeters || 40);
+      const isWfhToday = Boolean(todayData?.isWfhToday);
+      const radiusLimit = Math.round(todayData?.rule?.allowedRadiusMeters || 120);
 
-      if (isGeoEnabled && isOutsideGeofence) {
+      if (!isWfhToday && isGeoEnabled && isOutsideGeofence) {
         setError(`You are outside the Company area (${distanceFromOffice}m away). Punching is allowed only within ${radiusLimit}m of AP Corporation office.`);
         setSubmitting(false);
         return;
       }
 
-      if (isGeoEnabled && (locationStatus === 'denied' || (locationStatus === 'error' && !userLocation.latitude))) {
+      if (!isWfhToday && isGeoEnabled && (locationStatus === 'denied' || (locationStatus === 'error' && !userLocation.latitude))) {
         setError("Location access is required to punch. Please turn on location/GPS on your device and retry.");
         setSubmitting(false);
         return;
@@ -397,7 +419,9 @@ export default function Home() {
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
         accuracy: userLocation.accuracy,
-        location: distanceFromOffice != null ? `AP Corporation Office, Nashik (${distanceFromOffice}m away)` : undefined
+        location: isWfhToday
+          ? (userLocation.latitude ? `Work From Home (GPS: ${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)})` : 'Work From Home (Remote)')
+          : (distanceFromOffice != null ? `AP Corporation Office, Nashik (${distanceFromOffice}m away)` : undefined)
       };
 
       const res = await apiFetch(endpoint, {
@@ -503,6 +527,87 @@ export default function Home() {
     }
   };
 
+  // --- WFH Handlers ---
+  const handleApplyWfh = async (e) => {
+    e.preventDefault();
+    setSubmittingWfh(true);
+    setWfhMsg('');
+    try {
+      const res = await apiFetch('/employee/wfh-requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          startDate: wfhStartDate,
+          endDate: wfhEndDate,
+          reason: wfhReason
+        })
+      });
+
+      setWfhMsg(res.message);
+      setWfhStartDate('');
+      setWfhEndDate('');
+      setWfhReason('');
+      setShowWfhModal(false);
+      fetchLeaveData();
+      fetchTodayStatus(true);
+    } catch (err) {
+      alert("Failed to submit Work From Home request: " + err.message);
+    } finally {
+      setSubmittingWfh(false);
+    }
+  };
+
+  const handleReviewWfh = async (reqId, action) => {
+    setReviewingWfhId(reqId);
+    try {
+      await apiFetch(`/employee/wfh-requests/${reqId}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ action })
+      });
+      fetchLeaveData();
+      fetchTodayStatus(true);
+    } catch (err) {
+      alert("WFH Review failed: " + err.message);
+    } finally {
+      setReviewingWfhId(null);
+    }
+  };
+
+  const handleRequestWfhWithdraw = async (e) => {
+    e.preventDefault();
+    if (!withdrawWfhModalReq) return;
+    setSubmittingWfhWithdraw(true);
+    try {
+      const res = await apiFetch(`/employee/wfh-requests/${withdrawWfhModalReq.id}/withdraw`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: withdrawWfhReason })
+      });
+      alert(res.message);
+      setWithdrawWfhModalReq(null);
+      setWithdrawWfhReason('');
+      fetchLeaveData();
+      fetchTodayStatus(true);
+    } catch (err) {
+      alert("WFH withdrawal request failed: " + err.message);
+    } finally {
+      setSubmittingWfhWithdraw(false);
+    }
+  };
+
+  const handleCancelPendingWfh = async (reqId) => {
+    if (!window.confirm("Are you sure you want to cancel this pending Work From Home request?")) return;
+    try {
+      const res = await apiFetch(`/employee/wfh-requests/${reqId}/withdraw`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'Cancelled by employee' })
+      });
+      alert(res.message);
+      fetchLeaveData();
+      fetchTodayStatus(true);
+    } catch (err) {
+      alert("Failed to cancel WFH request: " + err.message);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -515,7 +620,8 @@ export default function Home() {
   const record = todayData?.record;
   const isPunchedIn = record && record.punchInTime;
   const isPunchedOut = record && record.punchOutTime;
-  const pendingManagedRequests = managedRequests.filter(r => r.status === 'pending');
+  const pendingManagedRequests = managedRequests.filter(r => r.status === 'pending' || r.status === 'withdrawal_requested');
+  const pendingManagedWfh = managedWfhRequests.filter(r => r.status === 'pending' || r.status === 'withdrawal_requested');
 
   return (
     <>
@@ -532,6 +638,20 @@ export default function Home() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setShowWfhModal(true)}
+              className="apc-btn apc-btn-secondary"
+              style={{
+                padding: '0.5rem 0.85rem',
+                fontSize: '0.85rem',
+                background: '#EDE9FE',
+                color: '#6D28D9',
+                borderColor: 'rgba(109, 40, 217, 0.35)',
+                fontWeight: 600
+              }}
+            >
+              <HomeIcon size={16} /> Apply for WFH
+            </button>
             <button onClick={() => setShowReimbModal(true)} className="apc-btn apc-btn-primary" style={{ padding: '0.5rem 0.85rem', fontSize: '0.85rem' }}>
               <Plus size={16} /> Claim Reimbursement
             </button>
@@ -732,9 +852,118 @@ export default function Home() {
           </div>
         )}
 
+        {/* WFH Active Today Banner */}
+        {todayData?.isWfhToday && (
+          <div
+            className="apc-card"
+            style={{
+              background: 'linear-gradient(135deg, rgba(109, 40, 217, 0.12) 0%, rgba(139, 92, 246, 0.04) 100%)',
+              border: '1px solid rgba(109, 40, 217, 0.35)',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.85rem',
+              padding: '1rem'
+            }}
+          >
+            <div style={{ background: '#EDE9FE', borderRadius: '50%', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <HomeIcon size={22} color="#6D28D9" />
+            </div>
+            <div>
+              <h4 style={{ color: '#6D28D9', margin: 0, fontSize: '0.98rem' }}>🏠 Work From Home (WFH) Active Today</h4>
+              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.82rem', color: 'var(--apc-text-secondary)' }}>
+                Your WFH profile is active ({todayData?.activeWfh?.startDate} to {todayData?.activeWfh?.endDate}). Office geofence restriction is <strong>waived</strong> — you can punch in & punch out remotely from anywhere!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {wfhMsg && (
+          <div className="apc-card" style={{ background: '#EDE9FE', border: '1px solid rgba(109, 40, 217, 0.35)', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.9rem', color: '#6D28D9', fontWeight: 600, margin: 0 }}>{wfhMsg}</p>
+          </div>
+        )}
+
         {leaveMsg && (
           <div className="apc-card" style={{ background: 'var(--apc-primary-tint)', border: '1px solid var(--apc-primary)', marginBottom: '1.5rem' }}>
-            <p style={{ fontSize: '0.9rem', color: 'var(--apc-primary-dark)', fontWeight: 600 }}>{leaveMsg}</p>
+            <p style={{ fontSize: '0.9rem', color: 'var(--apc-primary-dark)', fontWeight: 600, margin: 0 }}>{leaveMsg}</p>
+          </div>
+        )}
+
+        {/* REPORTING MANAGER SECTION: Direct Reports WFH Requests */}
+        {managedWfhRequests.length > 0 && (
+          <div className="apc-card" style={{ marginBottom: '1.5rem', borderLeft: '4px solid #6D28D9' }}>
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <HomeIcon size={18} color="#6D28D9" /> Direct Reports Work From Home Requests ({pendingManagedWfh.length} Pending)
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {managedWfhRequests.map(req => (
+                <div key={req.id} style={{ padding: '0.85rem', background: 'var(--apc-bg)', border: '1px solid var(--apc-border)', borderRadius: 'var(--apc-radius-sm)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <strong>{req.employeeName}</strong>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', marginLeft: '6px' }}>({req.department})</span>
+                      <div style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                        <span style={{ fontWeight: 600, color: '#6D28D9' }}>Work From Home</span>: {req.startDate} to {req.endDate}
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', marginTop: '0.25rem' }}>
+                        <strong>Reason:</strong> {req.reason}
+                      </p>
+                      {req.withdrawReason && (
+                        <p style={{ fontSize: '0.78rem', color: '#D97706', margin: '0.2rem 0 0 0' }}>
+                          <strong>Withdrawal Reason:</strong> {req.withdrawReason}
+                        </p>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {req.status === 'withdrawal_requested' ? (
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleReviewWfh(req.id, 'approve_withdrawal')}
+                            className="apc-btn apc-btn-primary"
+                            style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem' }}
+                            disabled={reviewingWfhId === req.id}
+                          >
+                            <Check size={14} /> Approve Withdrawal
+                          </button>
+                          <button
+                            onClick={() => handleReviewWfh(req.id, 'reject_withdrawal')}
+                            className="apc-btn apc-btn-danger"
+                            style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem' }}
+                            disabled={reviewingWfhId === req.id}
+                          >
+                            <X size={14} /> Reject Withdrawal
+                          </button>
+                        </div>
+                      ) : req.status === 'pending' ? (
+                        <>
+                          <button
+                            onClick={() => handleReviewWfh(req.id, 'approve')}
+                            className="apc-btn apc-btn-primary"
+                            style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', background: '#6D28D9', borderColor: '#6D28D9' }}
+                            disabled={reviewingWfhId === req.id}
+                          >
+                            <Check size={14} /> Approve WFH
+                          </button>
+                          <button
+                            onClick={() => handleReviewWfh(req.id, 'reject')}
+                            className="apc-btn apc-btn-danger"
+                            style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem' }}
+                            disabled={reviewingWfhId === req.id}
+                          >
+                            <X size={14} /> Reject
+                          </button>
+                        </>
+                      ) : (
+                        <StatusBadge status={req.status} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -814,6 +1043,50 @@ export default function Home() {
           </div>
         )}
 
+        {/* MY SUBMITTED WORK FROM HOME REQUESTS HISTORY */}
+        {myWfhRequests.length > 0 && (
+          <div className="apc-card" style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.05rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <HomeIcon size={16} color="#6D28D9" /> My Work From Home (WFH) Requests
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {myWfhRequests.slice(0, 10).map(req => (
+                <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: 'var(--apc-surface)', borderRadius: '4px', border: '1px solid var(--apc-border)', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6D28D9' }}>Work From Home</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)', marginLeft: '8px' }}>({req.startDate} to {req.endDate})</span>
+                    <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>
+                      Reason: "{req.reason}" · Manager: {req.reportingManagerName || 'Super Admin'} {req.withdrawReason ? `· Withdrawal Note: "${req.withdrawReason}"` : ''}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <StatusBadge status={req.status} />
+                    {req.status === 'approved' && (
+                      <button
+                        onClick={() => { setWithdrawWfhModalReq(req); setWithdrawWfhReason(''); }}
+                        className="apc-btn apc-btn-secondary"
+                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                      >
+                        Request Withdrawal
+                      </button>
+                    )}
+                    {req.status === 'pending' && (
+                      <button
+                        onClick={() => handleCancelPendingWfh(req.id)}
+                        className="apc-btn apc-btn-danger"
+                        style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                      >
+                        Cancel Request
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* MY SUBMITTED LEAVE REQUESTS HISTORY */}
         {myLeaveRequests.length > 0 && (
           <div className="apc-card" style={{ marginBottom: '1.5rem' }}>
@@ -854,6 +1127,42 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* REQUEST WFH WITHDRAWAL MODAL */}
+        {withdrawWfhModalReq && (
+          <div className="apc-modal-overlay">
+            <div className="apc-modal" style={{ maxWidth: '440px' }}>
+              <h3>Request WFH Withdrawal</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--apc-text-secondary)', margin: '0.5rem 0 1rem 0' }}>
+                Requesting to cancel approved <strong>Work From Home</strong> ({withdrawWfhModalReq.startDate} to {withdrawWfhModalReq.endDate}). This request will go to <strong>{withdrawWfhModalReq.reportingManagerName || 'Super Admin'}</strong> for approval.
+              </p>
+
+              <form onSubmit={handleRequestWfhWithdraw}>
+                <div className="apc-form-group">
+                  <label htmlFor="withdrawWfhReasonInput">Emergency / Reason for Coming to Office <span className="required">*</span></label>
+                  <textarea
+                    id="withdrawWfhReasonInput"
+                    className="apc-textarea"
+                    rows={3}
+                    placeholder="e.g. Reporting back to office / project meeting in-person"
+                    value={withdrawWfhReason}
+                    onChange={e => setWithdrawWfhReason(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+                  <button type="button" onClick={() => setWithdrawWfhModalReq(null)} className="apc-btn apc-btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" className="apc-btn apc-btn-primary" disabled={submittingWfhWithdraw}>
+                    {submittingWfhWithdraw ? 'Submitting...' : 'Submit WFH Withdrawal'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -1289,6 +1598,78 @@ export default function Home() {
           </div>
         )}
 
+        {/* Apply for Work From Home (WFH) Modal */}
+        {showWfhModal && (
+          <div className="apc-modal-overlay">
+            <div className="apc-modal" style={{ maxWidth: '460px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: '#6D28D9' }}>
+                  <HomeIcon size={20} color="#6D28D9" /> Apply for Work From Home
+                </h3>
+                <button onClick={() => setShowWfhModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <X size={20} color="var(--apc-text-secondary)" />
+                </button>
+              </div>
+
+              <div style={{ background: '#EDE9FE', border: '1px solid rgba(109, 40, 217, 0.25)', borderRadius: '6px', padding: '0.65rem 0.85rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#5B21B6' }}>
+                💡 <strong>How WFH Works:</strong> Once your reporting manager or admin approves this request, you will be able to punch in and punch out from <strong>anywhere</strong> without company office location restriction.
+              </div>
+
+              <form onSubmit={handleApplyWfh}>
+                <div className="apc-grid-2col" style={{ gap: '0.75rem' }}>
+                  <div className="apc-form-group">
+                    <label>Start Date <span className="required">*</span></label>
+                    <input
+                      type="date"
+                      className="apc-input"
+                      required
+                      value={wfhStartDate}
+                      onChange={e => setWfhStartDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="apc-form-group">
+                    <label>End Date <span className="required">*</span></label>
+                    <input
+                      type="date"
+                      className="apc-input"
+                      required
+                      value={wfhEndDate}
+                      onChange={e => setWfhEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="apc-form-group">
+                  <label>Reason for Work From Home <span className="required">*</span></label>
+                  <textarea
+                    className="apc-textarea"
+                    rows={3}
+                    required
+                    placeholder="e.g. Remote client assignments / bad weather / family emergency..."
+                    value={wfhReason}
+                    onChange={e => setWfhReason(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', marginBottom: '1rem', background: 'var(--apc-surface)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
+                  Approval Manager: <strong>{user?.reportingManagerName || 'Super Admin'}</strong>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setShowWfhModal(false)} className="apc-btn apc-btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" className="apc-btn apc-btn-primary" style={{ background: '#6D28D9', borderColor: '#6D28D9' }} disabled={submittingWfh}>
+                    <Send size={16} /> {submittingWfh ? 'Submitting...' : 'Submit WFH Request'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+
         {/* Claim Reimbursement Modal */}
         {showReimbModal && (
           <div className="apc-modal-overlay">
@@ -1423,11 +1804,11 @@ export default function Home() {
 
               {error && (
                 <div style={{ color: 'var(--apc-danger)', fontSize: '0.85rem', marginBottom: '0.75rem', fontWeight: 600 }}>
-                  <AlertTriangle size={14} inline /> {error}
+                  {error}
                 </div>
               )}
 
-              {/* Geofence Location Status Indicator Banner */}
+              {/* Geofence / WFH Location Status Indicator Banner */}
               <div
                 style={{
                   padding: '0.65rem 0.85rem',
@@ -1438,71 +1819,93 @@ export default function Home() {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '0.5rem',
-                  background:
-                    locationStatus === 'success'
-                      ? 'rgba(46, 158, 91, 0.12)'
-                      : locationStatus === 'locating'
-                      ? 'var(--apc-surface)'
-                      : 'rgba(229, 57, 53, 0.12)',
-                  border:
-                    locationStatus === 'success'
-                      ? '1px solid rgba(46, 158, 91, 0.4)'
-                      : locationStatus === 'locating'
-                      ? '1px solid var(--apc-border)'
-                      : '1px solid rgba(229, 57, 53, 0.4)',
-                  color:
-                    locationStatus === 'success'
-                      ? '#1E6B3C'
-                      : locationStatus === 'locating'
-                      ? 'var(--apc-text-primary)'
-                      : '#C62828'
+                  background: todayData?.isWfhToday
+                    ? '#EDE9FE'
+                    : locationStatus === 'success'
+                    ? 'rgba(46, 158, 91, 0.12)'
+                    : locationStatus === 'locating'
+                    ? 'var(--apc-surface)'
+                    : 'rgba(229, 57, 53, 0.12)',
+                  border: todayData?.isWfhToday
+                    ? '1px solid rgba(109, 40, 217, 0.35)'
+                    : locationStatus === 'success'
+                    ? '1px solid rgba(46, 158, 91, 0.4)'
+                    : locationStatus === 'locating'
+                    ? '1px solid var(--apc-border)'
+                    : '1px solid rgba(229, 57, 53, 0.4)',
+                  color: todayData?.isWfhToday
+                    ? '#6D28D9'
+                    : locationStatus === 'success'
+                    ? '#1E6B3C'
+                    : locationStatus === 'locating'
+                    ? 'var(--apc-text-primary)'
+                    : '#C62828'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                  {locationStatus === 'locating' && <RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} />}
-                  {locationStatus === 'success' && <MapPin size={16} color="#1E6B3C" />}
-                  {(locationStatus === 'error' || locationStatus === 'denied') && <AlertTriangle size={16} color="#C62828" />}
-                  
-                  <div>
-                    {locationStatus === 'locating' && <strong>Acquiring High-Precision GPS Lock...</strong>}
-                    {locationStatus === 'success' && (
-                      <>
-                        <strong style={{ color: '#1E6B3C' }}>Location Verified: Company Area</strong>
-                        <span style={{ display: 'block', fontSize: '0.76rem', color: '#2E7D32' }}>
-                          AP Corporation Office · <strong>{distanceFromOffice}m</strong> away {userLocation?.accuracy ? `(±${userLocation.accuracy}m GPS precision)` : ''}
+                  {todayData?.isWfhToday ? (
+                    <>
+                      <HomeIcon size={18} color="#6D28D9" />
+                      <div>
+                        <strong style={{ color: '#6D28D9' }}>Work From Home (WFH) Active</strong>
+                        <span style={{ display: 'block', fontSize: '0.76rem', color: '#5B21B6' }}>
+                          Company office radius check is waived · Remote punching enabled from anywhere
                         </span>
                         {userLocation?.latitude && (
-                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#4CAF50', fontFamily: 'monospace' }}>
-                            GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
+                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#6D28D9', fontFamily: 'monospace' }}>
+                            Remote GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
                           </span>
                         )}
-                      </>
-                    )}
-                    {locationStatus === 'denied' && (
-                      <>
-                        <strong>Location Access Disabled / Denied</strong>
-                        <span style={{ display: 'block', fontSize: '0.76rem', color: '#C62828' }}>
-                          Please turn on Location / GPS on your device to verify company area.
-                        </span>
-                      </>
-                    )}
-                    {locationStatus === 'error' && (
-                      <>
-                        <strong>{isOutsideGeofence ? "Outside Company Area" : "Location Check Failed"}</strong>
-                        <span style={{ display: 'block', fontSize: '0.76rem', color: '#C62828' }}>
-                          {locationError || "Turn on device location to punch attendance."}
-                        </span>
-                        {userLocation?.latitude && (
-                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#E53935', fontFamily: 'monospace', marginTop: '2px' }}>
-                            Live GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)} {userLocation?.accuracy ? `(±${userLocation.accuracy}m precision)` : ''}
-                          </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {locationStatus === 'locating' && <RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} />}
+                      {locationStatus === 'success' && <MapPin size={16} color="#1E6B3C" />}
+                      {(locationStatus === 'error' || locationStatus === 'denied') && <AlertTriangle size={16} color="#C62828" />}
+                      
+                      <div>
+                        {locationStatus === 'locating' && <strong>Acquiring High-Precision GPS Lock...</strong>}
+                        {locationStatus === 'success' && (
+                          <>
+                            <strong style={{ color: '#1E6B3C' }}>Location Verified: Company Area</strong>
+                            <span style={{ display: 'block', fontSize: '0.76rem', color: '#2E7D32' }}>
+                              AP Corporation Office · <strong>{distanceFromOffice}m</strong> away {userLocation?.accuracy ? `(±${userLocation.accuracy}m GPS precision)` : ''}
+                            </span>
+                            {userLocation?.latitude && (
+                              <span style={{ display: 'block', fontSize: '0.7rem', color: '#4CAF50', fontFamily: 'monospace' }}>
+                                GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
+                              </span>
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </div>
+                        {locationStatus === 'denied' && (
+                          <>
+                            <strong>Location Access Disabled / Denied</strong>
+                            <span style={{ display: 'block', fontSize: '0.76rem', color: '#C62828' }}>
+                              Please turn on Location / GPS on your device to verify company area.
+                            </span>
+                          </>
+                        )}
+                        {locationStatus === 'error' && (
+                          <>
+                            <strong>{isOutsideGeofence ? "Outside Company Area" : "Location Check Failed"}</strong>
+                            <span style={{ display: 'block', fontSize: '0.76rem', color: '#C62828' }}>
+                              {locationError || "Turn on device location to punch attendance."}
+                            </span>
+                            {userLocation?.latitude && (
+                              <span style={{ display: 'block', fontSize: '0.7rem', color: '#E53935', fontFamily: 'monospace', marginTop: '2px' }}>
+                                Live GPS: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)} {userLocation?.accuracy ? `(±${userLocation.accuracy}m precision)` : ''}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                {(locationStatus === 'denied' || locationStatus === 'error') && (
+                {!todayData?.isWfhToday && (locationStatus === 'denied' || locationStatus === 'error') && (
                   <button
                     type="button"
                     onClick={() => fetchUserLocation(todayData?.rule)}
@@ -1621,8 +2024,9 @@ export default function Home() {
                     onClick={capturePhoto}
                     className="apc-btn apc-btn-primary"
                     disabled={
-                      isOutsideGeofence ||
-                      ((todayData?.rule?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled) && locationStatus !== 'success')
+                      !todayData?.isWfhToday &&
+                      (isOutsideGeofence ||
+                      ((todayData?.rule?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled) && locationStatus !== 'success'))
                     }
                   >
                     <Camera size={16} /> Take Photo
@@ -1637,8 +2041,9 @@ export default function Home() {
                       className="apc-btn apc-btn-primary"
                       disabled={
                         submitting ||
-                        isOutsideGeofence ||
-                        ((todayData?.rule?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled) && locationStatus !== 'success')
+                        (!todayData?.isWfhToday &&
+                        (isOutsideGeofence ||
+                        ((todayData?.rule?.geofenceEnabled ?? DEFAULT_OFFICE_CONFIG.geofenceEnabled) && locationStatus !== 'success')))
                       }
                     >
                       <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Punch'}

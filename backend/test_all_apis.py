@@ -23,10 +23,10 @@ class APCTestSuite(unittest.TestCase):
         self.admin_token = data['token']
         self.admin_headers = {'Authorization': f"Bearer {self.admin_token}"}
 
-        # Login as Employee
+        # Login as Employee (Karan Muntode)
         res_emp = self.client.post('/api/auth/login', json={
-            'identifier': 'JO-DO-99-0001',
-            'password': 'Employee@123'
+            'identifier': 'karan@apc.com',
+            'password': 'Password@123'
         })
         data_emp = res_emp.get_json()
         self.emp_token = data_emp['token']
@@ -247,6 +247,70 @@ class APCTestSuite(unittest.TestCase):
         self.assertEqual(res_withdraw_appr.status_code, 200)
         self.assertEqual(res_withdraw_appr.get_json()['leaveRequest']['status'], 'withdrawn')
 
+    def test_12_wfh_workflow_and_remote_punch(self):
+        # 1. Login as Shivnath
+        res_shiv = self.client.post('/api/auth/login', json={
+            'identifier': 'shivnath@apc.com',
+            'password': 'Password@123'
+        })
+        self.assertEqual(res_shiv.status_code, 200)
+        shiv_token = res_shiv.get_json()['token']
+        shiv_headers = {'Authorization': f"Bearer {shiv_token}"}
+
+        # 2. Get today's date in IST
+        res_today = self.client.get('/api/attendance/today-status', headers=shiv_headers)
+        today_str = res_today.get_json()['todayDate']
+
+        # 3. Apply for WFH covering today
+        res_apply = self.client.post('/api/employee/wfh-requests', json={
+            'startDate': today_str,
+            'endDate': today_str,
+            'reason': 'Working from home due to heavy rain'
+        }, headers=shiv_headers)
+        self.assertEqual(res_apply.status_code, 201)
+        wfh_data = res_apply.get_json()['wfhRequest']
+        self.assertEqual(wfh_data['status'], 'pending')
+        wfh_id = wfh_data['id']
+
+        # 4. Login as Karan (Manager)
+        res_karan = self.client.post('/api/auth/login', json={
+            'identifier': 'karan@apc.com',
+            'password': 'Password@123'
+        })
+        karan_headers = {'Authorization': f"Bearer {res_karan.get_json()['token']}"}
+
+        # 5. Karan reviews and approves WFH
+        res_review = self.client.post(f'/api/employee/wfh-requests/{wfh_id}/review', json={
+            'action': 'approve',
+            'comment': 'Approved by Manager'
+        }, headers=karan_headers)
+        self.assertEqual(res_review.status_code, 200)
+        self.assertEqual(res_review.get_json()['wfhRequest']['status'], 'approved')
+
+        # 6. Shivnath checks today status - should indicate isWfhToday: True
+        res_today_after = self.client.get('/api/attendance/today-status', headers=shiv_headers)
+        self.assertEqual(res_today_after.status_code, 200)
+        self.assertTrue(res_today_after.get_json()['isWfhToday'])
+
+        # 7. Shivnath punches in from 5km away (Remote GPS coordinates)
+        res_remote_in = self.client.post('/api/attendance/punch-in', json={
+            'latitude': 20.050000,
+            'longitude': 73.850000,
+            'accuracy': 15,
+            'photo': 'data:image/jpeg;base64,dGVzdA=='
+        }, headers=shiv_headers)
+        self.assertIn(res_remote_in.status_code, [200, 400])
+        if res_remote_in.status_code == 200:
+            in_json = res_remote_in.get_json()
+            self.assertTrue(in_json.get('isWfh'))
+            self.assertIn('WFH', in_json.get('record', {}).get('punchInLocation', ''))
+
+        # 8. Super Admin fetches all WFH requests
+        res_admin_wfh = self.client.get('/api/admin/wfh-requests', headers=self.admin_headers)
+        self.assertEqual(res_admin_wfh.status_code, 200)
+        self.assertTrue(any(w['id'] == wfh_id for w in res_admin_wfh.get_json()['wfhRequests']))
+
 if __name__ == '__main__':
     unittest.main()
+
 

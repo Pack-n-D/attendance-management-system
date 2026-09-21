@@ -111,6 +111,7 @@ class AttendanceRecord(db.Model):
     punch_out_location = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), nullable=False)  # 'on_time', 'in_buffer', 'late', 'absent', 'on_leave', 'half_day'
     shift_type = db.Column(db.String(20), nullable=False, default='full_day')  # 'full_day', 'second_half'
+    is_wfh = db.Column(db.Boolean, default=False)
     late_reason = db.Column(db.Text, nullable=True)
     is_manual_override = db.Column(db.Boolean, default=False)
     admin_override_by = db.Column(db.String(100), nullable=True)
@@ -137,6 +138,7 @@ class AttendanceRecord(db.Model):
             'punchOutLocation': getattr(self, 'punch_out_location', None),
             'status': self.status,
             'shiftType': getattr(self, 'shift_type', 'full_day') or 'full_day',
+            'isWfh': bool(getattr(self, 'is_wfh', False)),
             'lateReason': self.late_reason,
             'isManualOverride': bool(getattr(self, 'is_manual_override', False)),
             'adminOverrideBy': getattr(self, 'admin_override_by', None),
@@ -362,6 +364,48 @@ class ReimbursementRequest(db.Model):
             'reviewedAt': self.reviewed_at.isoformat() if self.reviewed_at else None,
             'createdAt': self.created_at.isoformat() if self.created_at else None
         }
+
+
+class WFHRequest(db.Model):
+    __tablename__ = 'wfh_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.String(20), db.ForeignKey('employees.id'), nullable=False)
+    start_date = db.Column(db.String(10), nullable=False)  # YYYY-MM-DD
+    end_date = db.Column(db.String(10), nullable=False)    # YYYY-MM-DD
+    reason = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(30), nullable=False, default='pending')  # 'pending', 'approved', 'rejected', 'withdrawal_requested', 'withdrawn'
+    reporting_manager_id = db.Column(db.String(20), db.ForeignKey('employees.id'), nullable=True)
+    manager_comment = db.Column(db.Text, nullable=True)
+    withdraw_reason = db.Column(db.Text, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    employee = db.relationship('Employee', foreign_keys=[employee_id], backref='my_wfh_requests')
+    reporting_manager = db.relationship('Employee', foreign_keys=[reporting_manager_id], backref='managed_wfh_requests')
+
+    def __init__(self, **kwargs):
+        super(WFHRequest, self).__init__(**kwargs)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'employeeId': self.employee_id,
+            'employeeName': f"{self.employee.first_name} {self.employee.last_name}" if self.employee else self.employee_id,
+            'department': self.employee.department if self.employee else None,
+            'designation': self.employee.designation if self.employee else None,
+            'startDate': self.start_date,
+            'endDate': self.end_date,
+            'reason': self.reason,
+            'status': self.status,
+            'reportingManagerId': self.reporting_manager_id,
+            'reportingManagerName': f"{self.reporting_manager.first_name} {self.reporting_manager.last_name}" if self.reporting_manager else None,
+            'managerComment': self.manager_comment,
+            'withdrawReason': getattr(self, 'withdraw_reason', None),
+            'reviewedAt': self.reviewed_at.isoformat() if self.reviewed_at else None,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
+
 
 
 

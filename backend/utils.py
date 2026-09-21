@@ -6,7 +6,7 @@ import string
 import math
 from datetime import datetime, time, timezone, timedelta
 from flask import current_app
-from models import db, Employee, AttendanceRule, AuditLog, Holiday
+from models import db, Employee, AttendanceRule, AuditLog, Holiday, WFHRequest
 
 # IST Timezone (+05:30) for AP Corporation operations
 IST_TZ = timezone(timedelta(hours=5, minutes=30))
@@ -430,6 +430,32 @@ def validate_geofence(user_lat, user_lng, rule, user_accuracy=None):
         return True, f"Inside office radius ({round(distance, 1)}m)", round(distance, 1)
     else:
         return False, f"You are outside the Company area. Current distance is {int(distance)}m from AP Corporation office. Punching is only allowed within {int(allowed_radius)}m radius.", round(distance, 1)
+
+
+def is_employee_wfh_today(employee_id: str, date_str: str = None) -> tuple:
+    """
+    Checks if an employee has an APPROVED Work From Home (WFH) request covering the specified date (or today in IST).
+    Returns (is_wfh: bool, wfh_request_dict: dict or None)
+    """
+    if not employee_id:
+        return False, None
+    if not date_str:
+        date_str = get_current_date_str()
+    
+    try:
+        active_wfh = WFHRequest.query.filter(
+            WFHRequest.employee_id == employee_id,
+            WFHRequest.status == 'approved',
+            WFHRequest.start_date <= date_str,
+            WFHRequest.end_date >= date_str
+        ).first()
+        if active_wfh:
+            return True, active_wfh.to_dict()
+    except Exception as e:
+        print(f"Error checking active WFH: {e}")
+    
+    return False, None
+
 
 
 

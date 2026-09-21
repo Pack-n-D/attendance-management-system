@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from models import db, Employee, Document, AttendanceRecord, AttendanceRule, Holiday, AuditLog, LeaveRequest, ReimbursementRequest
+from models import db, Employee, Document, AttendanceRecord, AttendanceRule, Holiday, AuditLog, LeaveRequest, ReimbursementRequest, WFHRequest
 from utils import generate_employee_id, validate_password, generate_random_password, log_audit, get_current_now, get_current_date_str, get_current_time_str, save_base64_photo
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -83,6 +83,9 @@ def get_dashboard_stats():
     
     # Pending org-wide leave requests (including withdrawal requests)
     pending_leaves = LeaveRequest.query.filter(LeaveRequest.status.in_(['pending', 'withdrawal_requested'])).order_by(LeaveRequest.created_at.desc()).all()
+    
+    # Pending org-wide WFH requests (including withdrawal requests)
+    pending_wfh = WFHRequest.query.filter(WFHRequest.status.in_(['pending', 'withdrawal_requested'])).order_by(WFHRequest.created_at.desc()).all()
 
     return jsonify({
         'todayDate': today_str,
@@ -95,6 +98,7 @@ def get_dashboard_stats():
         },
         'lateArrivalsToday': late_arrivals,
         'pendingLeaveRequests': [l.to_dict() for l in pending_leaves],
+        'pendingWfhRequests': [w.to_dict() for w in pending_wfh],
         'trendChart': trend_chart
     }), 200
 
@@ -637,6 +641,92 @@ def admin_review_leave_request(req_id):
         'message': message_str,
         'leaveRequest': leave_req.to_dict()
     }), 200
+
+
+# --- ADMIN WORK FROM HOME (WFH) MANAGEMENT ---
+
+@admin_bp.route('/wfh-requests', methods=['GET'])
+def get_all_wfh_requests():
+    status = request.args.get('status')
+    search = request.args.get('search')
+
+    query = WFHRequest.query.join(Employee, WFHRequest.employee_id == Employee.id)
+
+    if status:
+        query = query.filter(WFHRequest.status == status)
+
+    if search:
+        search_pattern = f"%{search.strip()}%"
+        query = query.filter(
+            (Employee.first_name.ilike(search_pattern)) |
+            (Employee.last_name.ilike(search_pattern)) |
+            (Employee.id.ilike(search_pattern))
+        )
+
+    requests = query.order_by(WFHRequest.created_at.desc()).all()
+    return jsonify({
+        'wfhRequests': [r.to_dict() for r in requests]
+    }), 200
+
+
+@admin_bp.route('/wfh-requests/<int:req_id>/review', methods=['POST'])
+def admin_review_wfh_request(req_id):
+    admin_id = get_jwt_identity()
+    admin_user = Employee.query.get(admin_id)
+    admin_name = f"{admin_user.first_name} {admin_user.last_name}" if admin_user else "Super Admin"
+
+    wfh_req = WFHRequest.query.get(req_id)
+    if not wfh_req:
+        return jsonify({'error': 'Work From Home request not found'}), 404
+
+    data = request.get_json() or {}
+    action = data.get('action')  # 'approve', 'reject', 'approve_withdrawal', 'reject_withdrawal'
+    comment = data.get('comment', '')
+
+    if action not in ['approve', 'reject', 'approve_withdrawal', 'reject_withdrawal']:
+        return jsonify({'error': 'Invalid review action'}), 400
+
+    # Handling Withdrawal Request Review
+    if wfh_req.status == 'withdrawal_requested':
+        if action in ['approve', 'approve_withdrawal']:
+            wfh_req.status = 'withdrawn'
+            wfh_req.manager_comment = comment
+            wfh_req.reviewed_at = datetime.utcnow()
+            message_str = f"Super Admin approved WFH withdrawal for Employee {wfh_req.employee_id}."
+        else:
+            wfh_req.status = 'approved'
+            wfh_req.manager_comment = comment
+            wfh_req.reviewed_at = datetime.utcnow()
+            message_str = f"Super Admin rejected WFH withdrawal request for Employee {wfh_req.employee_id}."
+
+    # Handling Normal Pending WFH Review
+    else:
+        if action in ['approve', 'approve_withdrawal']:
+            wfh_req.status = 'approved'
+            wfh_req.manager_comment = comment
+            wfh_req.reviewed_at = datetime.utcnow()
+            message_str = f"Super Admin approved Work From Home Request #{req_id} for Employee {wfh_req.employee_id} ({wfh_req.start_date} to {wfh_req.end_date})."
+        else:
+            wfh_req.status = 'rejected'
+            wfh_req.manager_comment = comment
+            wfh_req.reviewed_at = datetime.utcnow()
+            message_str = f"Super Admin rejected Work From Home Request #{req_id}."
+
+    db.session.commit()
+
+    log_audit(
+        admin_id,
+        admin_name,
+        f"Super Admin Reviewed WFH Request #{req_id} ({action}) for Employee {wfh_req.employee_id}",
+        "WFHRequest",
+        str(req_id)
+    )
+
+    return jsonify({
+        'message': message_str,
+        'wfhRequest': wfh_req.to_dict()
+    }), 200
+
 
 
 @admin_bp.route('/employees/<id>/salary-slip', methods=['GET'])

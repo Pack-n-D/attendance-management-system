@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models import db, Employee, AttendanceRecord, AttendanceRule, Holiday, AuditLog
-from utils import compute_attendance_status, log_audit, get_current_now, get_current_date_str, get_current_time_str, validate_geofence
+from utils import compute_attendance_status, log_audit, get_current_now, get_current_date_str, get_current_time_str, validate_geofence, is_employee_wfh_today
 
 attendance_bp = Blueprint('attendance', __name__, url_prefix='/api/attendance')
 
@@ -43,12 +43,15 @@ def get_today_status():
 
     # Query strictly for today's record in IST date (Maharashtra GMT+5:30)
     record = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
+    is_wfh_today, active_wfh = is_employee_wfh_today(user_id, today_str)
     
     return jsonify({
         'todayDate': today_str,
         'currentTime': now_time_str,
         'rule': rule.to_dict(),
-        'record': record.to_dict() if record else None
+        'record': record.to_dict() if record else None,
+        'isWfhToday': is_wfh_today,
+        'activeWfh': active_wfh
     }), 200
 
 
@@ -93,17 +96,27 @@ def punch_in():
     if not rule:
         rule = AttendanceRule()
 
-    # Validate Geofence (office radius requirement with mobile accuracy buffer)
-    is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule, user_accuracy=accuracy)
-    if not is_geo_valid:
-        return jsonify({
-            'error': geo_msg,
-            'outsideArea': True,
-            'distance': geo_dist
-        }), 400
+    # Check Work From Home (WFH) approval status for today
+    is_wfh_today, active_wfh = is_employee_wfh_today(user_id, today_str)
 
-    if not location and geo_dist is not None:
-        location = f"AP Corporation Office ({geo_dist}m)"
+    # Validate Geofence (office radius requirement with mobile accuracy buffer)
+    # Bypassed if employee has approved Work From Home for today
+    if not is_wfh_today:
+        is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule, user_accuracy=accuracy)
+        if not is_geo_valid:
+            return jsonify({
+                'error': geo_msg,
+                'outsideArea': True,
+                'distance': geo_dist
+            }), 400
+
+        if not location and geo_dist is not None:
+            location = f"AP Corporation Office ({geo_dist}m)"
+    else:
+        if not location:
+            location = "Work From Home (Remote)"
+        else:
+            location = f"WFH: {location}"
 
     # Compute status server-side
     status, requires_reason = compute_attendance_status(now_time_str, today_str, rule, shift_type=shift_type)
@@ -126,6 +139,7 @@ def punch_in():
             punch_in_location=location,
             status=status,
             shift_type=shift_type,
+            is_wfh=is_wfh_today,
             late_reason=late_reason if requires_reason else None
         )
         db.session.add(record)
@@ -136,14 +150,17 @@ def punch_in():
         record.punch_in_location = location
         record.status = status
         record.shift_type = shift_type
+        record.is_wfh = is_wfh_today
         record.late_reason = late_reason if requires_reason else None
 
     db.session.commit()
 
+    wfh_tag = " [WFH]" if is_wfh_today else ""
     return jsonify({
-        'message': f"Punched in successfully at {now_time_str} ({'Second Half / Half Day' if shift_type == 'second_half' else 'Full Day'})",
+        'message': f"Punched in successfully at {now_time_str} ({'Second Half / Half Day' if shift_type == 'second_half' else 'Full Day'}){wfh_tag}",
         'recordedTime': now_time_str,
         'status': status,
+        'isWfh': is_wfh_today,
         'record': record.to_dict()
     }), 200
 
@@ -170,18 +187,6 @@ def punch_out():
     accuracy = data.get('accuracy')
     location = data.get('location')
 
-    # Validate Geofence for Punch Out as well
-    is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule, user_accuracy=accuracy)
-    if not is_geo_valid:
-        return jsonify({
-            'error': geo_msg,
-            'outsideArea': True,
-            'distance': geo_dist
-        }), 400
-
-    if not location and geo_dist is not None:
-        location = f"AP Corporation Office ({geo_dist}m)"
-
     record = AttendanceRecord.query.filter_by(employee_id=user_id, date=today_str).first()
     
     # Require punch in first - NEVER fabricate a fake punch-in record
@@ -192,6 +197,28 @@ def punch_out():
 
     if record.punch_out_time:
         return jsonify({'error': f'Already punched out today at {record.punch_out_time}'}), 400
+
+    # Check Work From Home approval
+    is_wfh_today, active_wfh = is_employee_wfh_today(user_id, today_str)
+    is_wfh = is_wfh_today or bool(getattr(record, 'is_wfh', False))
+
+    # Validate Geofence for Punch Out (bypassed if WFH)
+    if not is_wfh:
+        is_geo_valid, geo_msg, geo_dist = validate_geofence(latitude, longitude, rule, user_accuracy=accuracy)
+        if not is_geo_valid:
+            return jsonify({
+                'error': geo_msg,
+                'outsideArea': True,
+                'distance': geo_dist
+            }), 400
+
+        if not location and geo_dist is not None:
+            location = f"AP Corporation Office ({geo_dist}m)"
+    else:
+        if not location:
+            location = "Work From Home (Remote)"
+        else:
+            location = f"WFH: {location}"
 
     photo_base64 = data.get('photo')
     photo_url = save_base64_photo(photo_base64, folder_name=f"punch_out_{user_id}")

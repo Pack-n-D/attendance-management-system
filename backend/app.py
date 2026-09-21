@@ -110,6 +110,7 @@ def create_app():
             rec_cols = [
                 ("shift_type", "VARCHAR(20) DEFAULT 'full_day'"),
                 ("punch_out_location", "VARCHAR(255)"),
+                ("is_wfh", "BOOLEAN DEFAULT FALSE"),
                 ("is_manual_override", "BOOLEAN DEFAULT FALSE"),
                 ("admin_override_by", "VARCHAR(100)"),
                 ("admin_override_at", "TIMESTAMP"),

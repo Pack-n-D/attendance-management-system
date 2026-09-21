@@ -14,7 +14,9 @@ const STATUS_LABELS = {
   approved: 'Approved',
   rejected: 'Rejected',
   withdrawal_requested: 'Withdraw Requested',
-  withdrawn: 'Withdrawn'
+  withdrawn: 'Withdrawn',
+  wfh: 'Work From Home',
+  work_from_home: 'Work From Home'
 };
 
 export default function StatusBadge({ status }) {

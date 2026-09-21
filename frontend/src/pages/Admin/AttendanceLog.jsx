@@ -4,10 +4,10 @@ import StatusBadge from '../../components/StatusBadge';
 import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch, exportAttendanceCSV, getPhotoUrl } from '../../utils/api';
 import { DEPARTMENTS } from '../../utils/constants';
-import { Download, Calendar, Check, X, Clock, Camera, MapPin, Eye } from 'lucide-react';
+import { Download, Calendar, Check, X, Clock, Camera, MapPin, Eye, Home as HomeIcon } from 'lucide-react';
 
 export default function AttendanceLog() {
-  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance' or 'leaves'
+  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance', 'leaves', 'wfh'
 
   // Attendance Log state
   const [records, setRecords] = useState([]);
@@ -23,15 +23,22 @@ export default function AttendanceLog() {
   const [leaveStatusFilter, setLeaveStatusFilter] = useState('');
   const [reviewingId, setReviewingId] = useState(null);
 
+  // WFH Requests state
+  const [wfhRequests, setWfhRequests] = useState([]);
+  const [wfhStatusFilter, setWfhStatusFilter] = useState('');
+  const [reviewingWfhId, setReviewingWfhId] = useState(null);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (activeTab === 'attendance') {
       fetchLog();
-    } else {
+    } else if (activeTab === 'leaves') {
       fetchLeaveRequests();
+    } else if (activeTab === 'wfh') {
+      fetchWfhRequests();
     }
-  }, [activeTab, search, department, status, startDate, endDate, leaveStatusFilter]);
+  }, [activeTab, search, department, status, startDate, endDate, leaveStatusFilter, wfhStatusFilter]);
 
   const fetchLog = async () => {
     setLoading(true);
@@ -83,6 +90,37 @@ export default function AttendanceLog() {
     }
   };
 
+  const fetchWfhRequests = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (wfhStatusFilter) params.append('status', wfhStatusFilter);
+
+      const res = await apiFetch(`/admin/wfh-requests?${params.toString()}`);
+      setWfhRequests(res.wfhRequests || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdminReviewWfh = async (reqId, action) => {
+    setReviewingWfhId(reqId);
+    try {
+      await apiFetch(`/admin/wfh-requests/${reqId}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ action })
+      });
+      fetchWfhRequests();
+    } catch (err) {
+      alert("WFH Review failed: " + err.message);
+    } finally {
+      setReviewingWfhId(null);
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -92,8 +130,8 @@ export default function AttendanceLog() {
         <main className="apc-main-content">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h1 style={{ fontSize: '1.6rem' }}>Org-Wide Attendance & Leave Logs</h1>
-              <p style={{ fontSize: '0.88rem', color: 'var(--apc-text-secondary)' }}>Master records & leave approvals across AP Corporation</p>
+              <h1 style={{ fontSize: '1.6rem' }}>Org-Wide Attendance, Leaves & WFH Logs</h1>
+              <p style={{ fontSize: '0.88rem', color: 'var(--apc-text-secondary)' }}>Master records, leave approvals & remote WFH management across AP Corporation</p>
             </div>
 
             <button onClick={() => exportAttendanceCSV()} className="apc-btn apc-btn-secondary">
@@ -102,7 +140,7 @@ export default function AttendanceLog() {
           </div>
 
           {/* Navigation Tabs */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--apc-border)' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--apc-border)', flexWrap: 'wrap' }}>
             <button
               onClick={() => setActiveTab('attendance')}
               className={`apc-btn ${activeTab === 'attendance' ? 'apc-btn-primary' : 'apc-btn-secondary'}`}
@@ -115,7 +153,14 @@ export default function AttendanceLog() {
               className={`apc-btn ${activeTab === 'leaves' ? 'apc-btn-primary' : 'apc-btn-secondary'}`}
               style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none' }}
             >
-              <Calendar size={16} /> Leave Approvals & History
+              <Calendar size={16} /> Leave Approvals
+            </button>
+            <button
+              onClick={() => setActiveTab('wfh')}
+              className={`apc-btn ${activeTab === 'wfh' ? 'apc-btn-primary' : 'apc-btn-secondary'}`}
+              style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', background: activeTab === 'wfh' ? '#6D28D9' : undefined, borderColor: activeTab === 'wfh' ? '#6D28D9' : undefined }}
+            >
+              <HomeIcon size={16} /> Work From Home (WFH)
             </button>
           </div>
 
@@ -218,7 +263,14 @@ export default function AttendanceLog() {
                               <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>No Photo</span>
                             )}
                           </td>
-                          <td><StatusBadge status={r.status} /></td>
+                          <td>
+                            <StatusBadge status={r.status} />
+                            {r.isWfh && (
+                              <span className="apc-badge apc-badge-wfh" style={{ marginLeft: '6px', fontSize: '0.72rem', padding: '2px 6px' }}>
+                                🏠 WFH
+                              </span>
+                            )}
+                          </td>
                           <td style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)' }}>{r.lateReason || '—'}</td>
                         </tr>
                       ))
@@ -404,6 +456,121 @@ export default function AttendanceLog() {
                                   className="apc-btn apc-btn-danger"
                                   style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                                   disabled={reviewingId === r.id}
+                                >
+                                  <X size={12} /> Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)' }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* TAB 3: WORK FROM HOME (WFH) APPROVALS */}
+          {activeTab === 'wfh' && (
+            <>
+              <div className="apc-card" style={{ marginBottom: '1.25rem', padding: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    className="apc-input"
+                    style={{ maxWidth: '240px' }}
+                    placeholder="Search employee..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                  />
+
+                  <select className="apc-select" style={{ maxWidth: '180px' }} value={wfhStatusFilter} onChange={e => setWfhStatusFilter(e.target.value)}>
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending Approval</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="withdrawal_requested">Withdraw Requested</option>
+                    <option value="withdrawn">Withdrawn</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="apc-table-container">
+                <table className="apc-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Department</th>
+                      <th>Work Dates</th>
+                      <th>Reason</th>
+                      <th>Assigned Manager</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem' }}>Loading Work From Home requests...</td></tr>
+                    ) : wfhRequests.length === 0 ? (
+                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--apc-text-secondary)' }}>No Work From Home requests found.</td></tr>
+                    ) : (
+                      wfhRequests.map(r => (
+                        <tr key={r.id}>
+                          <td><strong>{r.employeeName}</strong></td>
+                          <td>{r.department}</td>
+                          <td>
+                            <strong style={{ color: '#6D28D9' }}>{r.startDate}</strong> to <strong style={{ color: '#6D28D9' }}>{r.endDate}</strong>
+                          </td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--apc-text-secondary)' }}>
+                            {r.reason}
+                            {r.withdrawReason && (
+                              <span style={{ display: 'block', color: '#D97706', fontSize: '0.78rem', marginTop: '2px' }}>
+                                Withdrawal Reason: {r.withdrawReason}
+                              </span>
+                            )}
+                          </td>
+                          <td>{r.reportingManagerName || 'Super Admin'}</td>
+                          <td>
+                            <StatusBadge status={r.status} />
+                          </td>
+                          <td>
+                            {r.status === 'withdrawal_requested' ? (
+                              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                <button
+                                  onClick={() => handleAdminReviewWfh(r.id, 'approve_withdrawal')}
+                                  className="apc-btn apc-btn-primary"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  disabled={reviewingWfhId === r.id}
+                                >
+                                  <Check size={12} /> Approve Withdrawal
+                                </button>
+                                <button
+                                  onClick={() => handleAdminReviewWfh(r.id, 'reject_withdrawal')}
+                                  className="apc-btn apc-btn-danger"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  disabled={reviewingWfhId === r.id}
+                                >
+                                  <X size={12} /> Reject Withdrawal
+                                </button>
+                              </div>
+                            ) : r.status === 'pending' ? (
+                              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                <button
+                                  onClick={() => handleAdminReviewWfh(r.id, 'approve')}
+                                  className="apc-btn apc-btn-primary"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: '#6D28D9', borderColor: '#6D28D9' }}
+                                  disabled={reviewingWfhId === r.id}
+                                >
+                                  <Check size={12} /> Approve WFH
+                                </button>
+                                <button
+                                  onClick={() => handleAdminReviewWfh(r.id, 'reject')}
+                                  className="apc-btn apc-btn-danger"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  disabled={reviewingWfhId === r.id}
                                 >
                                   <X size={12} /> Reject
                                 </button>

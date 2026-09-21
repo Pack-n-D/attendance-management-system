@@ -3,7 +3,7 @@ import base64
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Employee, Document, AttendanceRecord, AuditLog, LeaveRequest, ReimbursementRequest
+from models import db, Employee, Document, AttendanceRecord, AuditLog, LeaveRequest, ReimbursementRequest, WFHRequest
 from utils import log_audit, save_base64_photo
 
 employee_bp = Blueprint('employee', __name__, url_prefix='/api/employee')
@@ -358,6 +358,186 @@ def review_leave_request(req_id):
         'message': message_str,
         'leaveRequest': leave_req.to_dict()
     }), 200
+
+
+# --- WORK FROM HOME (WFH) MANAGEMENT ---
+
+@employee_bp.route('/wfh-requests', methods=['POST'])
+@jwt_required()
+def apply_wfh():
+    user_id = get_jwt_identity()
+    employee = Employee.query.get(user_id)
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+
+    data = request.get_json() or {}
+    start_date = data.get('startDate')
+    end_date = data.get('endDate')
+    reason = data.get('reason')
+
+    if not start_date or not end_date or not reason:
+        return jsonify({'error': 'Start date, end date, and reason are required for Work From Home application.'}), 400
+
+    # Auto assign reporting manager
+    manager_id = employee.reporting_manager_id
+
+    wfh_req = WFHRequest(
+        employee_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        reason=reason.strip(),
+        status='pending',
+        reporting_manager_id=manager_id
+    )
+
+    db.session.add(wfh_req)
+    db.session.commit()
+
+    manager_name = f"{employee.reporting_manager.first_name} {employee.reporting_manager.last_name}" if employee.reporting_manager else 'Super Admin'
+
+    log_audit(
+        user_id,
+        f"{employee.first_name} {employee.last_name}",
+        f"Applied for Work From Home ({start_date} to {end_date}) -> Sent to Manager {manager_name}",
+        "WFHRequest",
+        str(wfh_req.id)
+    )
+
+    return jsonify({
+        'message': f'Work From Home request submitted successfully! Sent to {manager_name} for approval.',
+        'wfhRequest': wfh_req.to_dict()
+    }), 201
+
+
+@employee_bp.route('/wfh-requests', methods=['GET'])
+@jwt_required()
+def get_my_wfh_requests():
+    user_id = get_jwt_identity()
+    requests = WFHRequest.query.filter_by(employee_id=user_id).order_by(WFHRequest.created_at.desc()).all()
+    return jsonify({
+        'wfhRequests': [r.to_dict() for r in requests]
+    }), 200
+
+
+@employee_bp.route('/managed-wfh-requests', methods=['GET'])
+@jwt_required()
+def get_managed_wfh_requests():
+    user_id = get_jwt_identity()
+    employee = Employee.query.get(user_id)
+    
+    # If user is super_admin, return all requests; otherwise direct reports
+    if employee and employee.role == 'super_admin':
+        requests = WFHRequest.query.order_by(WFHRequest.created_at.desc()).all()
+    else:
+        requests = WFHRequest.query.filter_by(reporting_manager_id=user_id).order_by(WFHRequest.created_at.desc()).all()
+
+    return jsonify({
+        'wfhRequests': [r.to_dict() for r in requests]
+    }), 200
+
+
+@employee_bp.route('/wfh-requests/<int:req_id>/withdraw', methods=['POST'])
+@jwt_required()
+def request_wfh_withdrawal(req_id):
+    user_id = get_jwt_identity()
+    wfh_req = WFHRequest.query.get(req_id)
+    if not wfh_req:
+        return jsonify({'error': 'Work From Home request not found'}), 404
+
+    if wfh_req.employee_id != user_id:
+        return jsonify({'error': 'Unauthorized. This WFH request does not belong to you.'}), 403
+
+    data = request.get_json() or {}
+    withdraw_reason = data.get('reason', '').strip()
+
+    if wfh_req.status == 'pending':
+        wfh_req.status = 'withdrawn'
+        wfh_req.withdraw_reason = withdraw_reason or 'Cancelled by employee'
+        db.session.commit()
+        log_audit(user_id, "Employee", f"Cancelled pending WFH Request #{req_id}", "WFHRequest", str(req_id))
+        return jsonify({
+            'message': 'Pending Work From Home request cancelled successfully.',
+            'wfhRequest': wfh_req.to_dict()
+        }), 200
+
+    elif wfh_req.status == 'approved':
+        wfh_req.status = 'withdrawal_requested'
+        wfh_req.withdraw_reason = withdraw_reason or 'Emergency / Reporting back to office'
+        db.session.commit()
+        log_audit(user_id, "Employee", f"Requested withdrawal for approved WFH Request #{req_id}", "WFHRequest", str(req_id))
+        return jsonify({
+            'message': 'WFH withdrawal request submitted to reporting manager.',
+            'wfhRequest': wfh_req.to_dict()
+        }), 200
+
+    else:
+        return jsonify({'error': f'Cannot withdraw WFH request with current status ({wfh_req.status}).'}), 400
+
+
+@employee_bp.route('/wfh-requests/<int:req_id>/review', methods=['POST'])
+@jwt_required()
+def review_wfh_request(req_id):
+    user_id = get_jwt_identity()
+    reviewer = Employee.query.get(user_id)
+    if not reviewer:
+        return jsonify({'error': 'Reviewer employee record not found'}), 404
+
+    wfh_req = WFHRequest.query.get(req_id)
+    if not wfh_req:
+        return jsonify({'error': 'Work From Home request not found'}), 404
+
+    # Permission check: must be assigned manager or super admin
+    if reviewer.role != 'super_admin' and wfh_req.reporting_manager_id != user_id:
+        return jsonify({'error': 'Unauthorized. You are not the assigned reporting manager for this request.'}), 403
+
+    data = request.get_json() or {}
+    action = data.get('action')  # 'approve', 'reject', 'approve_withdrawal', 'reject_withdrawal'
+    comment = data.get('comment', '')
+
+    if action not in ['approve', 'reject', 'approve_withdrawal', 'reject_withdrawal']:
+        return jsonify({'error': 'Invalid review action'}), 400
+
+    # Handling Withdrawal Review
+    if wfh_req.status == 'withdrawal_requested':
+        if action in ['approve', 'approve_withdrawal']:
+            wfh_req.status = 'withdrawn'
+            wfh_req.manager_comment = comment
+            wfh_req.reviewed_at = datetime.utcnow()
+            message_str = f"Approved WFH withdrawal for Employee {wfh_req.employee_id}."
+        else:
+            wfh_req.status = 'approved'
+            wfh_req.manager_comment = comment
+            wfh_req.reviewed_at = datetime.utcnow()
+            message_str = f"Rejected WFH withdrawal request for Employee {wfh_req.employee_id}."
+
+    # Handling Normal Pending WFH Review
+    else:
+        if action in ['approve', 'approve_withdrawal']:
+            wfh_req.status = 'approved'
+            wfh_req.manager_comment = comment
+            wfh_req.reviewed_at = datetime.utcnow()
+            message_str = f"Approved Work From Home Request #{req_id} for Employee {wfh_req.employee_id} ({wfh_req.start_date} to {wfh_req.end_date})."
+        else:
+            wfh_req.status = 'rejected'
+            wfh_req.manager_comment = comment
+            wfh_req.reviewed_at = datetime.utcnow()
+            message_str = f"Rejected Work From Home Request #{req_id}."
+
+    db.session.commit()
+
+    log_audit(
+        user_id,
+        f"{reviewer.first_name} {reviewer.last_name}",
+        f"Reviewed WFH Request #{req_id} ({action}) for Employee {wfh_req.employee_id}",
+        "WFHRequest",
+        str(req_id)
+    )
+
+    return jsonify({
+        'message': message_str,
+        'wfhRequest': wfh_req.to_dict()
+    }), 200
+
 
 
 @employee_bp.route('/salary-slips', methods=['GET'])

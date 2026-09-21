@@ -4,11 +4,12 @@ import StatusBadge from '../../components/StatusBadge';
 import AdminSidebar from '../../components/AdminSidebar';
 import { apiFetch } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
-import { Users, Clock, AlertTriangle, PlusCircle, Settings, TrendingUp, Calendar, Check, X } from 'lucide-react';
+import { Users, Clock, AlertTriangle, PlusCircle, Settings, TrendingUp, Calendar, Check, X, Laptop } from 'lucide-react';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [pendingLeaves, setPendingLeaves] = useState([]);
+  const [pendingWfh, setPendingWfh] = useState([]);
   const [loading, setLoading] = useState(true);
   const [reviewingId, setReviewingId] = useState(null);
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchDashboard();
     fetchPendingLeaves();
+    fetchPendingWfh();
   }, []);
 
   const fetchDashboard = async () => {
@@ -39,6 +41,15 @@ export default function Dashboard() {
     }
   };
 
+  const fetchPendingWfh = async () => {
+    try {
+      const res = await apiFetch('/admin/wfh-requests?status=pending');
+      setPendingWfh(res.wfhRequests || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleAdminReviewLeave = async (reqId, action) => {
     setReviewingId(reqId);
     try {
@@ -55,10 +66,27 @@ export default function Dashboard() {
     }
   };
 
+  const handleAdminReviewWfh = async (reqId, action) => {
+    setReviewingId(`wfh-${reqId}`);
+    try {
+      await apiFetch(`/admin/wfh-requests/${reqId}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ action })
+      });
+      fetchPendingWfh();
+      fetchDashboard();
+    } catch (err) {
+      alert("WFH Review failed: " + err.message);
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
   const stats = data?.stats || { totalEmployees: 0, present: 0, late: 0, absent: 0, onLeave: 0 };
   const lateArrivals = data?.lateArrivalsToday || [];
   const trendChart = data?.trendChart || [];
   const pendingLeavesList = (data?.pendingLeaveRequests && data.pendingLeaveRequests.length > 0) ? data.pendingLeaveRequests : pendingLeaves;
+  const pendingWfhList = (data?.pendingWfhRequests && data.pendingWfhRequests.length > 0) ? data.pendingWfhRequests : pendingWfh;
 
   if (loading) {
     return (
@@ -199,6 +227,94 @@ export default function Dashboard() {
                                 className="apc-btn apc-btn-danger"
                                 style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
                                 disabled={reviewingId === req.id}
+                              >
+                                <X size={14} /> Reject
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Org-Wide Pending WFH Approvals Section */}
+          {pendingWfhList.length > 0 && (
+            <div className="apc-card" style={{ marginBottom: '1.75rem', borderLeft: '4px solid #8b5cf6' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6d28d9' }}>
+                <Laptop size={18} color="#7c3aed" /> Pending Work From Home (WFH) Requests for Approval ({pendingWfhList.length})
+              </h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                {pendingWfhList.map(req => {
+                  const isWithdrawal = req.status === 'withdrawal_requested';
+                  return (
+                    <div key={req.id} style={{ padding: '0.85rem', background: 'var(--apc-bg)', border: `1px solid ${isWithdrawal ? 'var(--apc-warning)' : 'var(--apc-border)'}`, borderRadius: 'var(--apc-radius-sm)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <strong>{req.employeeName}</strong>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--apc-text-secondary)' }}>({req.department})</span>
+                            {isWithdrawal && (
+                              <span style={{ fontSize: '0.72rem', background: 'var(--apc-warning-bg)', color: 'var(--apc-warning)', border: '1px solid rgba(226, 163, 59, 0.4)', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                WITHDRAWAL REQUEST
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', color: '#7c3aed', fontWeight: 600 }}>
+                            WFH: {req.startDate} to {req.endDate}
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--apc-text-secondary)', marginTop: '0.2rem', margin: '2px 0' }}>
+                            <strong>Reason:</strong> {req.reason}
+                          </p>
+                          {isWithdrawal && req.withdrawReason && (
+                            <p style={{ fontSize: '0.8rem', color: 'var(--apc-danger)', margin: '2px 0' }}>
+                              <strong>Withdrawal Note:</strong> {req.withdrawReason}
+                            </p>
+                          )}
+                          <span style={{ fontSize: '0.75rem', color: 'var(--apc-text-secondary)', display: 'block', marginTop: '2px' }}>
+                            Manager: {req.reportingManagerName || 'Super Admin'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          {isWithdrawal ? (
+                            <>
+                              <button
+                                onClick={() => handleAdminReviewWfh(req.id, 'approve_withdrawal')}
+                                className="apc-btn apc-btn-primary"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', background: '#7c3aed', borderColor: '#7c3aed' }}
+                                disabled={reviewingId === `wfh-${req.id}`}
+                              >
+                                <Check size={14} /> Approve Withdrawal
+                              </button>
+                              <button
+                                onClick={() => handleAdminReviewWfh(req.id, 'reject_withdrawal')}
+                                className="apc-btn apc-btn-danger"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                                disabled={reviewingId === `wfh-${req.id}`}
+                              >
+                                <X size={14} /> Reject Withdrawal
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleAdminReviewWfh(req.id, 'approve')}
+                                className="apc-btn apc-btn-primary"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', background: '#7c3aed', borderColor: '#7c3aed' }}
+                                disabled={reviewingId === `wfh-${req.id}`}
+                              >
+                                <Check size={14} /> Approve WFH
+                              </button>
+                              <button
+                                onClick={() => handleAdminReviewWfh(req.id, 'reject')}
+                                className="apc-btn apc-btn-danger"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                                disabled={reviewingId === `wfh-${req.id}`}
                               >
                                 <X size={14} /> Reject
                               </button>
