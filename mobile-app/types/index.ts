@@ -98,6 +98,7 @@ export interface Holiday {
   id: number;
   date: string; // YYYY-MM-DD
   label: string;
+  name?: string;
 }
 
 export interface LeaveRequest {

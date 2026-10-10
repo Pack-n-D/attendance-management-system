@@ -26,12 +26,14 @@ import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import ErrorView from '../../components/ErrorView';
+import AttendanceCalendar from '../../components/AttendanceCalendar';
 import { attendanceService } from '../../services/attendanceService';
 import { adminService } from '../../services/adminService';
 import { AttendanceRecord, ShiftType } from '../../types';
 import { formatDate, formatTime } from '../../utils/formatters';
 
 export default function AdminAttendanceLogScreen() {
+  const [viewMode, setViewMode] = useState<'logs' | 'calendar'>('logs');
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -258,62 +260,105 @@ export default function AdminAttendanceLogScreen() {
         }
       />
 
-      {/* Filter Strip */}
-      <View style={styles.filterSection}>
-        <Input
-          placeholder="Filter by employee name or ID..."
-          value={search}
-          onChangeText={setSearch}
-          leftIcon={<Ionicons name="search-outline" size={18} color={Colors.textSecondary} />}
-          containerStyle={{ marginBottom: 8 }}
-        />
+      {/* View Mode Toggle: Daily Logs vs Monthly Calendar */}
+      <View style={styles.viewToggleRow}>
+        <TouchableOpacity
+          style={[styles.toggleBtn, viewMode === 'logs' && styles.toggleBtnActive]}
+          onPress={() => setViewMode('logs')}
+        >
+          <Ionicons
+            name="list-outline"
+            size={15}
+            color={viewMode === 'logs' ? '#FFFFFF' : Colors.textSecondary}
+          />
+          <Text
+            style={[styles.toggleBtnText, viewMode === 'logs' && styles.toggleBtnTextActive]}
+          >
+            Daily Logs
+          </Text>
+        </TouchableOpacity>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statusChipsRow}>
-          {statusOptions.map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.statusChip, statusFilter === opt.value && styles.statusChipActive]}
-              onPress={() => setStatusFilter(opt.value)}
-            >
-              <Text style={[styles.statusChipText, statusFilter === opt.value && styles.statusChipTextActive]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <TouchableOpacity
+          style={[styles.toggleBtn, viewMode === 'calendar' && styles.toggleBtnActive]}
+          onPress={() => setViewMode('calendar')}
+        >
+          <Ionicons
+            name="calendar-outline"
+            size={15}
+            color={viewMode === 'calendar' ? '#FFFFFF' : Colors.textSecondary}
+          />
+          <Text
+            style={[styles.toggleBtnText, viewMode === 'calendar' && styles.toggleBtnTextActive]}
+          >
+            Monthly Calendar
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {loading && !refreshing ? (
-        <View style={styles.loadingBox}>
-          <LoadingSkeleton height={120} style={{ marginBottom: 12 }} />
-          <LoadingSkeleton height={120} style={{ marginBottom: 12 }} />
-          <LoadingSkeleton height={120} />
-        </View>
-      ) : errorMessage ? (
-        <ErrorView message={errorMessage} onRetry={() => loadLogs()} />
+      {viewMode === 'calendar' ? (
+        <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 }}>
+          <AttendanceCalendar />
+        </ScrollView>
       ) : (
-        <FlatList
-          data={records}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[Colors.primary]}
+        <>
+          {/* Filter Strip */}
+          <View style={styles.filterSection}>
+            <Input
+              placeholder="Filter by employee name or ID..."
+              value={search}
+              onChangeText={setSearch}
+              leftIcon={<Ionicons name="search-outline" size={18} color={Colors.textSecondary} />}
+              containerStyle={{ marginBottom: 8 }}
             />
-          }
-          ListHeaderComponent={
-            <Text style={styles.recordsHeader}>LOG ENTRIES ({records.length})</Text>
-          }
-          ListEmptyComponent={
-            <EmptyState
-              title="No Attendance Logs"
-              description="No entries matched the query or filter criteria."
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statusChipsRow}>
+              {statusOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.statusChip, statusFilter === opt.value && styles.statusChipActive]}
+                  onPress={() => setStatusFilter(opt.value)}
+                >
+                  <Text style={[styles.statusChipText, statusFilter === opt.value && styles.statusChipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {loading && !refreshing ? (
+            <View style={styles.loadingBox}>
+              <LoadingSkeleton height={120} style={{ marginBottom: 12 }} />
+              <LoadingSkeleton height={120} style={{ marginBottom: 12 }} />
+              <LoadingSkeleton height={120} />
+            </View>
+          ) : errorMessage ? (
+            <ErrorView message={errorMessage} onRetry={() => loadLogs()} />
+          ) : (
+            <FlatList
+              data={records}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={renderItem}
+              contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={[Colors.primary]}
+                />
+              }
+              ListHeaderComponent={
+                <Text style={styles.recordsHeader}>LOG ENTRIES ({records.length})</Text>
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  title="No Attendance Logs"
+                  description="No entries matched the query or filter criteria."
+                />
+              }
             />
-          }
-        />
+          )}
+        </>
       )}
 
       {/* Override Modal */}
@@ -409,6 +454,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  viewToggleRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: Colors.surface,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceSubtle,
+    gap: 6,
+  },
+  toggleBtnActive: {
+    backgroundColor: Colors.primaryDark,
+  },
+  toggleBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  toggleBtnTextActive: {
+    color: '#FFFFFF',
   },
   iconBtn: {
     padding: 8,

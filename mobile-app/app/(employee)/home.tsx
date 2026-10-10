@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../constants/Colors';
 import Card from '../../components/Card';
@@ -37,6 +38,7 @@ import { formatDate, formatTime, getGreeting } from '../../utils/formatters';
 
 export default function EmployeeHomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
 
   const [todayData, setTodayData] = useState<TodayAttendanceStatusResponse | null>(null);
@@ -155,7 +157,7 @@ export default function EmployeeHomeScreen() {
   return (
     <View style={styles.container}>
       {/* Top Navbar */}
-      <View style={styles.navbar}>
+      <View style={[styles.navbar, { paddingTop: Math.max(insets.top, 14) }]}>
         <Logo size="small" showSubtitle={false} />
         <TouchableOpacity
           style={styles.profileBadge}

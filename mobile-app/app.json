@@ -19,7 +19,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "APC Attendance requires camera access for selfie identity verification during punch-in/out and expense receipt capture.",
         "NSLocationWhenInUseUsageDescription": "APC Attendance requires location access to verify employee proximity to the office geofence perimeter.",
-        "NSPhotoLibraryUsageDescription": "APC Attendance requires photo library access to upload expense receipts and profile photos."
+        "NSPhotoLibraryUsageDescription": "APC Attendance requires photo library access to upload expense receipts and profile photos.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -29,11 +30,12 @@
       },
       "package": "com.apcorporation.attendancemanagement",
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -58,6 +60,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f013229f-d3f7-4d83-8968-79d0b88e0470"
+      }
     }
   }
 }

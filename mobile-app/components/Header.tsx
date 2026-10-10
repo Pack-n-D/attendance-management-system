@@ -6,6 +6,7 @@ import React, { ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '../constants/Colors';
 import Logo from './Logo';
 
@@ -27,6 +28,7 @@ export function Header({
   onBackPress,
 }: HeaderProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const handleBack = () => {
     if (onBackPress) {
@@ -37,7 +39,7 @@ export function Header({
   };
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
       <View style={styles.left}>
         {showBack && (
           <TouchableOpacity

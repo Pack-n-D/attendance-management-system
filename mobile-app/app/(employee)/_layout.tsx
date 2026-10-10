@@ -5,9 +5,12 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '../../constants/Colors';
 
 export default function EmployeeLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -18,8 +21,8 @@ export default function EmployeeLayout() {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          height: 58 + Math.max(insets.bottom, 6),
+          paddingBottom: Math.max(insets.bottom, 6),
           paddingTop: 6,
         },
         tabBarLabelStyle: {
@@ -40,7 +43,7 @@ export default function EmployeeLayout() {
       <Tabs.Screen
         name="attendance"
         options={{
-          title: 'History',
+          title: 'Calendar',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),

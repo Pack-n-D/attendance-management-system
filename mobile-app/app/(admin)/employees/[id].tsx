@@ -26,6 +26,7 @@ import StatusBadge from '../../../components/StatusBadge';
 import CameraModal from '../../../components/CameraModal';
 import LoadingSkeleton from '../../../components/LoadingSkeleton';
 import ErrorView from '../../../components/ErrorView';
+import AttendanceCalendar from '../../../components/AttendanceCalendar';
 import { adminService } from '../../../services/adminService';
 import { Employee, DocumentItem, AttendanceRecord, SalarySlip } from '../../../types';
 import { formatDate, formatTime, formatCurrency } from '../../../utils/formatters';
@@ -389,6 +390,12 @@ export default function EmployeeDetailScreen() {
                 </View>
               </View>
             ))}
+          </Card>
+
+          {/* Attendance Calendar Matrix */}
+          <Card style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>ATTENDANCE CALENDAR MATRIX</Text>
+            <AttendanceCalendar initialEmployeeId={employee.id} />
           </Card>
 
           {/* Danger Zone */}
