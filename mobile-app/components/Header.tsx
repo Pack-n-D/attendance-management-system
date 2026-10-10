@@ -3,7 +3,7 @@
  */
 
 import React, { ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,8 +38,13 @@ export function Header({
     }
   };
 
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 28) + 10 : 44
+  );
+
   return (
-    <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
+    <View style={[styles.header, { paddingTop: topInset }]}>
       <View style={styles.left}>
         {showBack && (
           <TouchableOpacity
@@ -72,7 +77,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 12,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,

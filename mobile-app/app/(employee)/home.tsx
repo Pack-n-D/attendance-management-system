@@ -13,6 +13,8 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +42,11 @@ export default function EmployeeHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
+
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 28) + 10 : 44
+  );
 
   const [todayData, setTodayData] = useState<TodayAttendanceStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,7 +164,7 @@ export default function EmployeeHomeScreen() {
   return (
     <View style={styles.container}>
       {/* Top Navbar */}
-      <View style={[styles.navbar, { paddingTop: Math.max(insets.top, 14) }]}>
+      <View style={[styles.navbar, { paddingTop: topInset }]}>
         <Logo size="small" showSubtitle={false} />
         <TouchableOpacity
           style={styles.profileBadge}
@@ -468,7 +475,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 12,
     paddingBottom: 10,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,

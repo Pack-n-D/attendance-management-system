@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../constants/Colors';
 import Logo from '../../components/Logo';
@@ -26,6 +27,7 @@ import { getApiBaseUrl, setCustomApiUrl } from '../../services/api';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { login } = useAuth();
 
   const [identifier, setIdentifier] = useState('');
@@ -89,7 +91,13 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: Math.max(insets.top + 16, 48),
+            paddingBottom: Math.max(insets.bottom + 20, 40),
+          },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         {/* Top Branding Section */}

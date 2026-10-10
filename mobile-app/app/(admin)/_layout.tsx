@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +11,7 @@ import Colors from '../../constants/Colors';
 
 export default function AdminLayout() {
   const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 12);
 
   return (
     <Tabs
@@ -21,12 +23,12 @@ export default function AdminLayout() {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 58 + Math.max(insets.bottom, 6),
-          paddingBottom: Math.max(insets.bottom, 6),
+          height: 58 + bottomInset,
+          paddingBottom: bottomInset,
           paddingTop: 6,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: '700',
         },
       }}
@@ -79,10 +81,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="audit"
         options={{
-          title: 'Audit Log',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="shield-outline" size={size} color={color} />
-          ),
+          href: null,
         }}
       />
     </Tabs>
