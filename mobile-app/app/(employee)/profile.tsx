@@ -26,6 +26,7 @@ import Input from '../../components/Input';
 import CameraModal from '../../components/CameraModal';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import ErrorView from '../../components/ErrorView';
+import Avatar from '../../components/Avatar';
 import { employeeService } from '../../services/employeeService';
 import { Employee, DocumentItem } from '../../types';
 import { formatDate } from '../../utils/formatters';
@@ -134,7 +135,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="My Profile" />
+      <Header title="My Profile" showBack={true} />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -158,28 +159,31 @@ export default function ProfileScreen() {
             {/* Profile Avatar Card */}
             <Card style={styles.avatarCard} elevated>
               <View style={styles.avatarWrapper}>
-                {emp?.profilePhotoUrl ? (
-                  <Image source={{ uri: emp.profilePhotoUrl }} style={styles.avatarImage} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarInitials}>
-                      {emp?.firstName?.[0]}
-                      {emp?.lastName?.[0]}
-                    </Text>
-                  </View>
-                )}
+                <Avatar
+                  src={emp?.profilePhotoUrl}
+                  name={emp?.fullName || emp?.firstName}
+                  size={90}
+                  fontSize={32}
+                  borderWidth={2.5}
+                  borderColor={Colors.primary}
+                />
                 <TouchableOpacity
                   style={styles.editPhotoBadge}
                   onPress={() => setShowPhotoCamera(true)}
+                  activeOpacity={0.8}
                 >
-                  <Ionicons name="camera" size={14} color="#1A1612" />
+                  <Ionicons name="camera" size={15} color="#1A1612" />
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.fullName}>{emp?.fullName || `${emp?.firstName} ${emp?.lastName}`}</Text>
-              <Text style={styles.designationText}>{emp?.designation} • {emp?.department}</Text>
+              <Text style={styles.fullName}>
+                {emp?.fullName || `${emp?.firstName || ''} ${emp?.lastName || ''}`.trim() || 'Employee'}
+              </Text>
+              <Text style={styles.designationText}>
+                {emp?.designation || 'Staff'} {emp?.department ? `• ${emp.department}` : ''}
+              </Text>
               <View style={styles.idBadge}>
-                <Text style={styles.idText}>ID: {emp?.id}</Text>
+                <Text style={styles.idText}>ID: {emp?.id || '-'}</Text>
               </View>
             </Card>
 
@@ -194,13 +198,13 @@ export default function ProfileScreen() {
 
               <View style={styles.row}>
                 <Text style={styles.label}>Email Address</Text>
-                <Text style={styles.value}>{emp?.email}</Text>
+                <Text style={styles.value}>{emp?.email || '-'}</Text>
               </View>
               <View style={styles.divider} />
 
               <View style={styles.row}>
                 <Text style={styles.label}>Phone Number</Text>
-                <Text style={styles.value}>{emp?.phone}</Text>
+                <Text style={styles.value}>{emp?.phone || '-'}</Text>
               </View>
               <View style={styles.divider} />
 

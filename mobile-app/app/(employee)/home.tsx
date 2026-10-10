@@ -29,6 +29,7 @@ import LoadingSkeleton from '../../components/LoadingSkeleton';
 import ErrorView from '../../components/ErrorView';
 import Input from '../../components/Input';
 import Logo from '../../components/Logo';
+import Avatar from '../../components/Avatar';
 import { attendanceService } from '../../services/attendanceService';
 import { useLocation } from '../../hooks/useLocation';
 import {
@@ -169,11 +170,23 @@ export default function EmployeeHomeScreen() {
         <TouchableOpacity
           style={styles.profileBadge}
           onPress={() => router.push('/(employee)/profile')}
+          activeOpacity={0.7}
         >
-          <Ionicons name="person-circle-outline" size={26} color={Colors.textPrimary} />
-          <Text style={styles.profileName} numberOfLines={1}>
-            {user?.firstName || 'Employee'}
-          </Text>
+          <View style={styles.profileInfoText}>
+            <Text style={styles.profileName} numberOfLines={1}>
+              {user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Employee'}
+            </Text>
+            <Text style={styles.profileSubtext} numberOfLines={1}>
+              {user?.id || ''} {user?.department ? `(${user.department})` : ''}
+            </Text>
+          </View>
+          <Avatar
+            src={user?.profilePhotoUrl}
+            name={user?.fullName || user?.firstName}
+            size={36}
+            borderWidth={1.5}
+            borderColor={Colors.primary}
+          />
         </TouchableOpacity>
       </View>
 
@@ -447,13 +460,15 @@ export default function EmployeeHomeScreen() {
         </View>
       </ScrollView>
 
-      {/* Camera Capture Modal */}
+      {/* Camera Capture Modal - Strictly Front Camera Selfie Only */}
       <CameraModal
         visible={showCamera}
         onClose={() => setShowCamera(false)}
         onPhotoCaptured={handlePhotoCaptured}
         title={punchActionType === 'in' ? 'Punch In Selfie' : 'Punch Out Selfie'}
-        subtitle="Capture a live face verification photo to record your punch."
+        subtitle="Capture a live front-camera face verification selfie to record punch."
+        onlySelfie={true}
+        allowGallery={false}
         preferFrontCamera={true}
       />
     </View>
@@ -483,17 +498,23 @@ const styles = StyleSheet.create({
   profileBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.surfaceSubtle,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 20,
+    gap: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+  profileInfoText: {
+    alignItems: 'flex-end',
   },
   profileName: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
     color: Colors.textPrimary,
-    maxWidth: 90,
+    maxWidth: 130,
+  },
+  profileSubtext: {
+    fontSize: 10,
+    color: Colors.textSecondary,
+    maxWidth: 130,
   },
   scrollContent: {
     padding: 16,

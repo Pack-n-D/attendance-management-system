@@ -1,7 +1,8 @@
 /**
  * Camera & Image Capture Modal Component
- * Supports live selfie verification for Punch In/Out with Front and Back camera switching
- * Gallery upload is disabled by default for strict live attendance integrity
+ * Live Selfie Verification for Punch In/Out:
+ * - When in onlySelfie mode (default for attendance): Front Camera ONLY, NO Gallery, NO Back Camera option
+ * - When allowGallery is explicitly enabled (e.g. receipts/documents): allows gallery selection
  */
 
 import React, { useState } from 'react';
@@ -26,24 +27,26 @@ interface CameraModalProps {
   onPhotoCaptured: (base64Photo: string) => void;
   title?: string;
   subtitle?: string;
+  onlySelfie?: boolean; // Default true: front camera only, no back camera, no gallery
+  allowGallery?: boolean; // Default false for strict attendance integrity
   preferFrontCamera?: boolean;
-  allowGallery?: boolean; // Default false for attendance security
 }
 
 export function CameraModal({
   visible,
   onClose,
   onPhotoCaptured,
-  title = 'Photo Verification',
-  subtitle = 'Please capture a clear live photo to verify attendance.',
-  preferFrontCamera = true,
+  title = 'Selfie Verification',
+  subtitle = 'Please capture a clear live front-camera selfie to record attendance.',
+  onlySelfie = true,
   allowGallery = false,
+  preferFrontCamera = true,
 }: CameraModalProps) {
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [base64Data, setBase64Data] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>(
-    preferFrontCamera ? 'front' : 'back'
+    onlySelfie ? 'front' : preferFrontCamera ? 'front' : 'back'
   );
 
   const takePhoto = async () => {
@@ -53,16 +56,20 @@ export function CameraModal({
       if (!perm.granted) {
         Alert.alert(
           'Camera Permission Required',
-          'Camera access is required to capture verification photos for attendance.'
+          'Camera access is required to capture verification selfies for attendance.'
         );
         return;
       }
 
+      // In onlySelfie mode, strictly use front camera
+      const selectedType = onlySelfie
+        ? ImagePicker.CameraType.front
+        : cameraFacing === 'front'
+        ? ImagePicker.CameraType.front
+        : ImagePicker.CameraType.back;
+
       const result = await ImagePicker.launchCameraAsync({
-        cameraType:
-          cameraFacing === 'front'
-            ? ImagePicker.CameraType.front
-            : ImagePicker.CameraType.back,
+        cameraType: selectedType,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.6,
@@ -147,57 +154,59 @@ export function CameraModal({
 
           <Text style={styles.sheetSubtitle}>{subtitle}</Text>
 
-          {/* Camera Lens Toggle (Front Selfie vs Back Camera) */}
-          <View style={styles.cameraToggleContainer}>
-            <Text style={styles.cameraToggleLabel}>Select Camera:</Text>
-            <View style={styles.cameraToggleRow}>
-              <TouchableOpacity
-                style={[
-                  styles.toggleOption,
-                  cameraFacing === 'front' && styles.toggleOptionActive,
-                ]}
-                onPress={() => setCameraFacing('front')}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="person-circle-outline"
-                  size={18}
-                  color={cameraFacing === 'front' ? Colors.primaryDark : Colors.textSecondary}
-                />
-                <Text
+          {/* Camera Lens Toggle ONLY when NOT in onlySelfie mode */}
+          {!onlySelfie && (
+            <View style={styles.cameraToggleContainer}>
+              <Text style={styles.cameraToggleLabel}>Select Camera:</Text>
+              <View style={styles.cameraToggleRow}>
+                <TouchableOpacity
                   style={[
-                    styles.toggleOptionText,
-                    cameraFacing === 'front' && styles.toggleOptionTextActive,
+                    styles.toggleOption,
+                    cameraFacing === 'front' && styles.toggleOptionActive,
                   ]}
+                  onPress={() => setCameraFacing('front')}
+                  activeOpacity={0.7}
                 >
-                  Front (Selfie)
-                </Text>
-              </TouchableOpacity>
+                  <Ionicons
+                    name="person-circle-outline"
+                    size={18}
+                    color={cameraFacing === 'front' ? Colors.primaryDark : Colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.toggleOptionText,
+                      cameraFacing === 'front' && styles.toggleOptionTextActive,
+                    ]}
+                  >
+                    Front (Selfie)
+                  </Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.toggleOption,
-                  cameraFacing === 'back' && styles.toggleOptionActive,
-                ]}
-                onPress={() => setCameraFacing('back')}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="camera-outline"
-                  size={18}
-                  color={cameraFacing === 'back' ? Colors.primaryDark : Colors.textSecondary}
-                />
-                <Text
+                <TouchableOpacity
                   style={[
-                    styles.toggleOptionText,
-                    cameraFacing === 'back' && styles.toggleOptionTextActive,
+                    styles.toggleOption,
+                    cameraFacing === 'back' && styles.toggleOptionActive,
                   ]}
+                  onPress={() => setCameraFacing('back')}
+                  activeOpacity={0.7}
                 >
-                  Back Camera
-                </Text>
-              </TouchableOpacity>
+                  <Ionicons
+                    name="camera-outline"
+                    size={18}
+                    color={cameraFacing === 'back' ? Colors.primaryDark : Colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.toggleOptionText,
+                      cameraFacing === 'back' && styles.toggleOptionTextActive,
+                    ]}
+                  >
+                    Back Camera
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Photo Preview or Capture Area */}
           <View style={styles.previewContainer}>
@@ -208,17 +217,15 @@ export function CameraModal({
             ) : (
               <View style={styles.placeholder}>
                 <Ionicons
-                  name={cameraFacing === 'front' ? 'person-circle-outline' : 'camera-outline'}
+                  name="person-circle-outline"
                   size={64}
                   color={Colors.primaryDark}
                 />
                 <Text style={styles.placeholderText}>
-                  {cameraFacing === 'front'
-                    ? 'Front selfie camera ready'
-                    : 'Back camera ready'}
+                  Front selfie camera ready
                 </Text>
                 <Text style={styles.placeholderSubtext}>
-                  Live camera capture only
+                  Live face verification only • No gallery allowed
                 </Text>
               </View>
             )}
@@ -228,13 +235,13 @@ export function CameraModal({
           {previewUri ? (
             <View style={styles.actionsRow}>
               <Button
-                title="Retake"
+                title="Retake Selfie"
                 onPress={takePhoto}
                 variant="outline"
                 style={{ flex: 1 }}
               />
               <Button
-                title="Use Photo"
+                title="Use Selfie"
                 onPress={handleConfirm}
                 variant="primary"
                 style={{ flex: 1 }}
@@ -243,11 +250,10 @@ export function CameraModal({
           ) : (
             <View style={styles.buttonsColumn}>
               <Button
-                title={`Open ${cameraFacing === 'front' ? 'Selfie Camera' : 'Back Camera'}`}
+                title="Take Live Selfie"
                 onPress={takePhoto}
                 variant="primary"
                 icon={<Ionicons name="camera" size={18} color="#1A1612" />}
-                style={allowGallery ? styles.btnSpacing : undefined}
               />
               {allowGallery && (
                 <Button
@@ -384,9 +390,6 @@ const styles = StyleSheet.create({
   },
   buttonsColumn: {
     gap: 10,
-  },
-  btnSpacing: {
-    marginBottom: 4,
   },
 });
 
