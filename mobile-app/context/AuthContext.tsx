@@ -3,7 +3,7 @@
  * Manages secure user session, role-based access, and token lifecycle
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Employee, UserRole } from '../types';
 import Config from '../constants/Config';
@@ -98,14 +98,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateLocalUser = (updated: Partial<Employee>) => {
+  const updateLocalUser = useCallback((updated: Partial<Employee>) => {
     setUser((prev) => {
       if (!prev) return null;
       const merged = { ...prev, ...updated };
       SecureStore.setItemAsync(Config.storageKeys.user, JSON.stringify(merged)).catch(() => {});
       return merged;
     });
-  };
+  }, []);
 
   const isAuthenticated = !!token && !!user;
   const isAdmin = user?.role === 'super_admin';

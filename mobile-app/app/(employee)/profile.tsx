@@ -56,16 +56,18 @@ export default function ProfileScreen() {
     setErrorMessage(null);
     try {
       const res = await employeeService.getProfile();
-      setProfile(res.employee);
-      setDocuments(res.documents);
-      updateLocalUser(res.employee);
+      if (res && res.employee) {
+        setProfile(res.employee);
+        setDocuments(res.documents || []);
+      }
     } catch (err: any) {
+      console.warn('Profile fetch notice:', err.message);
       setErrorMessage(err.message || 'Failed to load employee profile.');
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
       setRefreshing(false);
     }
-  }, [updateLocalUser]);
+  }, []);
 
   useEffect(() => {
     loadProfile();
@@ -144,7 +146,7 @@ export default function ProfileScreen() {
           />
         }
       >
-        {loading && !refreshing ? (
+        {!emp && loading && !refreshing ? (
           <View>
             <LoadingSkeleton height={140} style={{ marginBottom: 16 }} />
             <LoadingSkeleton height={180} />
