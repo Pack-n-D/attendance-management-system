@@ -288,6 +288,7 @@ export default function ProfileScreen() {
         title="Update Profile Photo"
         subtitle="Take a photo or choose from gallery to update your avatar."
         preferFrontCamera={true}
+        allowGallery={true}
       />
 
       {/* Info Update Modal */}

@@ -165,7 +165,7 @@ export default function EmployeeHomeScreen() {
     <View style={styles.container}>
       {/* Top Navbar */}
       <View style={[styles.navbar, { paddingTop: topInset }]}>
-        <Logo size="small" showSubtitle={false} />
+        <Logo size="small" />
         <TouchableOpacity
           style={styles.profileBadge}
           onPress={() => router.push('/(employee)/profile')}

@@ -426,6 +426,7 @@ export default function EmployeeDetailScreen() {
         title="Update Employee Photo"
         subtitle="Take a photo for official employee records."
         preferFrontCamera={true}
+        allowGallery={true}
       />
 
       {/* Edit Details Modal */}

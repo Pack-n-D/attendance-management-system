@@ -346,6 +346,7 @@ export default function ReimbursementsScreen() {
         title="Capture Receipt Photo"
         subtitle="Take a clear photo of the bill or expense voucher."
         preferFrontCamera={false}
+        allowGallery={true}
       />
     </View>
   );

@@ -1,7 +1,7 @@
 /**
  * Camera & Image Capture Modal Component
- * Supports live selfie verification for Punch In/Out and receipt capture
- * Output matches the backend base64 photo requirement
+ * Supports live selfie verification for Punch In/Out with Front and Back camera switching
+ * Gallery upload is disabled by default for strict live attendance integrity
  */
 
 import React, { useState } from 'react';
@@ -27,19 +27,24 @@ interface CameraModalProps {
   title?: string;
   subtitle?: string;
   preferFrontCamera?: boolean;
+  allowGallery?: boolean; // Default false for attendance security
 }
 
 export function CameraModal({
   visible,
   onClose,
   onPhotoCaptured,
-  title = 'Selfie Verification',
-  subtitle = 'Please capture a clear photo of yourself to record attendance.',
+  title = 'Photo Verification',
+  subtitle = 'Please capture a clear live photo to verify attendance.',
   preferFrontCamera = true,
+  allowGallery = false,
 }: CameraModalProps) {
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [base64Data, setBase64Data] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>(
+    preferFrontCamera ? 'front' : 'back'
+  );
 
   const takePhoto = async () => {
     try {
@@ -54,9 +59,10 @@ export function CameraModal({
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        cameraType: preferFrontCamera
-          ? ImagePicker.CameraType.front
-          : ImagePicker.CameraType.back,
+        cameraType:
+          cameraFacing === 'front'
+            ? ImagePicker.CameraType.front
+            : ImagePicker.CameraType.back,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.6,
@@ -141,6 +147,58 @@ export function CameraModal({
 
           <Text style={styles.sheetSubtitle}>{subtitle}</Text>
 
+          {/* Camera Lens Toggle (Front Selfie vs Back Camera) */}
+          <View style={styles.cameraToggleContainer}>
+            <Text style={styles.cameraToggleLabel}>Select Camera:</Text>
+            <View style={styles.cameraToggleRow}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleOption,
+                  cameraFacing === 'front' && styles.toggleOptionActive,
+                ]}
+                onPress={() => setCameraFacing('front')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="person-circle-outline"
+                  size={18}
+                  color={cameraFacing === 'front' ? Colors.primaryDark : Colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.toggleOptionText,
+                    cameraFacing === 'front' && styles.toggleOptionTextActive,
+                  ]}
+                >
+                  Front (Selfie)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toggleOption,
+                  cameraFacing === 'back' && styles.toggleOptionActive,
+                ]}
+                onPress={() => setCameraFacing('back')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="camera-outline"
+                  size={18}
+                  color={cameraFacing === 'back' ? Colors.primaryDark : Colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.toggleOptionText,
+                    cameraFacing === 'back' && styles.toggleOptionTextActive,
+                  ]}
+                >
+                  Back Camera
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Photo Preview or Capture Area */}
           <View style={styles.previewContainer}>
             {loading ? (
@@ -150,12 +208,17 @@ export function CameraModal({
             ) : (
               <View style={styles.placeholder}>
                 <Ionicons
-                  name={preferFrontCamera ? 'person-circle-outline' : 'camera-outline'}
-                  size={72}
+                  name={cameraFacing === 'front' ? 'person-circle-outline' : 'camera-outline'}
+                  size={64}
                   color={Colors.primaryDark}
                 />
                 <Text style={styles.placeholderText}>
-                  No photo captured yet
+                  {cameraFacing === 'front'
+                    ? 'Front selfie camera ready'
+                    : 'Back camera ready'}
+                </Text>
+                <Text style={styles.placeholderSubtext}>
+                  Live camera capture only
                 </Text>
               </View>
             )}
@@ -180,18 +243,20 @@ export function CameraModal({
           ) : (
             <View style={styles.buttonsColumn}>
               <Button
-                title="Open Camera"
+                title={`Open ${cameraFacing === 'front' ? 'Selfie Camera' : 'Back Camera'}`}
                 onPress={takePhoto}
                 variant="primary"
                 icon={<Ionicons name="camera" size={18} color="#1A1612" />}
-                style={styles.btnSpacing}
+                style={allowGallery ? styles.btnSpacing : undefined}
               />
-              <Button
-                title="Choose from Gallery"
-                onPress={pickFromGallery}
-                variant="secondary"
-                icon={<Ionicons name="images-outline" size={18} color={Colors.textPrimary} />}
-              />
+              {allowGallery && (
+                <Button
+                  title="Choose from Gallery"
+                  onPress={pickFromGallery}
+                  variant="secondary"
+                  icon={<Ionicons name="images-outline" size={18} color={Colors.textPrimary} />}
+                />
+              )}
             </View>
           )}
         </View>
@@ -217,7 +282,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   sheetTitle: {
     fontSize: 18,
@@ -230,20 +295,69 @@ const styles = StyleSheet.create({
   sheetSubtitle: {
     fontSize: 13,
     color: Colors.textSecondary,
-    marginBottom: 16,
+    marginBottom: 12,
     lineHeight: 18,
+  },
+  cameraToggleContainer: {
+    marginBottom: 14,
+  },
+  cameraToggleLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  cameraToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: Colors.surfaceSubtle,
+    padding: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  toggleOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  toggleOptionActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  toggleOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  toggleOptionTextActive: {
+    color: Colors.primaryDark,
+    fontWeight: '800',
   },
   previewContainer: {
     width: '100%',
-    height: 240,
+    height: 220,
     backgroundColor: Colors.surfaceSubtle,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
     overflow: 'hidden',
-    marginBottom: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+    marginBottom: 16,
   },
   previewImage: {
     width: '100%',
@@ -252,22 +366,27 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   placeholderText: {
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  placeholderSubtext: {
+    fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 8,
-    fontWeight: '500',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   buttonsColumn: {
     gap: 10,
   },
   btnSpacing: {
     marginBottom: 4,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 12,
   },
 });
 

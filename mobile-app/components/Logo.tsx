@@ -1,53 +1,78 @@
 /**
  * Official APC Brand Logo Component for Mobile
- * Recreates the official AP Corporation oval star brand identity
+ * Recreates frontend/src/components/Logo.jsx with exact visual fidelity:
+ * - Transparent background
+ * - Tilted thin black oval ring (#1A1A1A)
+ * - 8-pointed stars (✦)
+ * - Forward-slanted bold italic golden orange "APC" (#FAA61A)
+ * - Uppercase "ATTENDANCE" wordmark (#75706A)
  */
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Colors from '../constants/Colors';
 
 interface LogoProps {
   size?: 'small' | 'medium' | 'large';
   showSubtitle?: boolean;
+  lockup?: 'full' | 'icon';
 }
 
-export function Logo({ size = 'medium', showSubtitle = true }: LogoProps) {
+export function Logo({
+  size = 'medium',
+  showSubtitle = true,
+  lockup = 'full',
+}: LogoProps) {
   const isSmall = size === 'small';
   const isLarge = size === 'large';
 
-  const badgeHeight = isLarge ? 50 : isSmall ? 32 : 40;
-  const badgeWidth = isLarge ? 110 : isSmall ? 70 : 88;
-  const apcFontSize = isLarge ? 26 : isSmall ? 16 : 20;
+  // Sizing tokens
+  const ovalHeight = isLarge ? 48 : isSmall ? 30 : 38;
+  const ovalWidth = isLarge ? 116 : isSmall ? 76 : 94;
+  const apcFontSize = isLarge ? 24 : isSmall ? 15 : 19;
+  const starSize = isLarge ? 11 : isSmall ? 8 : 9;
+  const wordmarkFontSize = isLarge ? 13 : isSmall ? 9.5 : 11;
+
+  const shouldShowWordmark = showSubtitle && lockup === 'full';
 
   return (
     <View style={styles.container}>
-      {/* Oval Brand Emblem */}
+      {/* Tilted Oval Ring with APC & Stars */}
       <View
         style={[
-          styles.ovalBadge,
+          styles.ovalRing,
           {
-            height: badgeHeight,
-            width: badgeWidth,
-            borderRadius: badgeHeight / 2,
+            height: ovalHeight,
+            width: ovalWidth,
+            borderRadius: ovalHeight / 2,
           },
         ]}
       >
-        <Text style={[styles.starSymbol, isSmall && styles.starSmall]}>✦</Text>
-        <Text style={[styles.apcWordmark, { fontSize: apcFontSize }]}>APC</Text>
-        <Text style={[styles.starSymbol, isSmall && styles.starSmall]}>✦</Text>
+        {/* Top-Left Star */}
+        <Text style={[styles.starSymbol, { fontSize: starSize, top: isLarge ? 4 : 2, left: isLarge ? 8 : 5 }]}>
+          ✦
+        </Text>
+
+        {/* Slanted Golden Orange APC Text */}
+        <Text style={[styles.apcText, { fontSize: apcFontSize }]}>
+          APC
+        </Text>
+
+        {/* Bottom-Right Star */}
+        <Text style={[styles.starSymbol, { fontSize: starSize, bottom: isLarge ? 4 : 2, right: isLarge ? 8 : 5 }]}>
+          ✦
+        </Text>
       </View>
 
-      {/* Subtitle Lockup */}
-      {showSubtitle && (
-        <View style={styles.textContainer}>
-          <Text style={[styles.brandTitle, isSmall && styles.brandTitleSmall]}>
-            AP CORPORATION
-          </Text>
-          <Text style={[styles.brandSubtitle, isSmall && styles.brandSubtitleSmall]}>
-            ATTENDANCE SYSTEM
-          </Text>
-        </View>
+      {/* Official "ATTENDANCE" Wordmark */}
+      {shouldShowWordmark && (
+        <Text
+          style={[
+            styles.attendanceWordmark,
+            { fontSize: wordmarkFontSize },
+          ]}
+        >
+          ATTENDANCE
+        </Text>
       )}
     </View>
   );
@@ -57,58 +82,35 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
-  ovalBadge: {
-    backgroundColor: '#1E1B18',
-    borderWidth: 2,
-    borderColor: Colors.primary,
+  ovalRing: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.8,
+    borderColor: '#1A1A1A',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    gap: 4,
-    transform: [{ rotate: '-4deg' }],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    transform: [{ rotate: '-12deg' }],
+    position: 'relative',
+    paddingHorizontal: 12,
   },
   starSymbol: {
-    color: '#E8E2D8',
-    fontSize: 10,
+    position: 'absolute',
+    color: '#1A1A1A',
+    fontWeight: '900',
   },
-  starSmall: {
-    fontSize: 8,
-  },
-  apcWordmark: {
-    color: Colors.primary,
+  apcText: {
+    color: '#FAA61A',
     fontWeight: '900',
     fontStyle: 'italic',
-    letterSpacing: 1.5,
-  },
-  textContainer: {
-    justifyContent: 'center',
-  },
-  brandTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: Colors.textPrimary,
     letterSpacing: 1,
   },
-  brandTitleSmall: {
-    fontSize: 11,
-  },
-  brandSubtitle: {
-    fontSize: 10,
+  attendanceWordmark: {
+    color: '#75706A',
     fontWeight: '700',
-    color: Colors.textSecondary,
-    letterSpacing: 1.2,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
-  },
-  brandSubtitleSmall: {
-    fontSize: 8,
   },
 });
 

@@ -142,7 +142,7 @@ export default function AdminDashboardScreen() {
     <View style={styles.container}>
       {/* Top Admin Navbar */}
       <View style={styles.navbar}>
-        <Logo size="small" showSubtitle={false} />
+        <Logo size="small" />
         <View style={styles.navRight}>
           <View style={styles.adminBadge}>
             <Text style={styles.adminBadgeText}>SUPER ADMIN</Text>

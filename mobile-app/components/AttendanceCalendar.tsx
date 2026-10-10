@@ -1,6 +1,11 @@
 /**
  * AttendanceCalendar Component for Mobile
- * Recreates frontend/src/components/AttendanceCalendar.jsx with exact visual styles & behavior
+ * Exactly recreates frontend/src/components/AttendanceCalendar.jsx layout & visual styling:
+ * - Top Card: Month Header with Calendar Icon, Employee ID & Name subtitle, Navigation (< Prev, Current, Next >)
+ * - 6-KPI Analytics Grid: Present (Green), Late / Buffer (Amber), Leaves (Blue), Off / Holiday (Purple), Absent (Red), Worked Time (Slate)
+ * - Color Legend Strip with swatches
+ * - Bottom Card: 7-column calendar matrix with Red SUN header, Day numbers, TODAY badge, and exact status pills
+ * - Day Detail & Admin Override Modal
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -20,16 +25,16 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import Card from './Card';
 import Button from './Button';
-import StatusBadge from './StatusBadge';
 import { useAuth } from '../context/AuthContext';
-import { attendanceService } from '../services/attendanceService';
 import { adminService } from '../services/adminService';
-import { apiFetch } from '../services/api';
+import { apiFetch, getPhotoUrl } from '../services/api';
 import { AttendanceRecord, Holiday, LeaveRequest, Employee } from '../types';
-import { formatDate, formatTime } from '../utils/formatters';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CELL_SIZE = Math.floor((SCREEN_WIDTH - 48) / 7);
+// Table cell width for 7-column grid
+const CELL_WIDTH = 86;
+const CELL_HEIGHT = 88;
+const CALENDAR_MIN_WIDTH = CELL_WIDTH * 7 + 12;
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -67,9 +72,6 @@ export default function AttendanceCalendar({
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // View mode: 'calendar' or 'list'
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
-
   // Selected Day Detail Modal
   const [selectedDay, setSelectedDay] = useState<any | null>(null);
   const [savingOverride, setSavingOverride] = useState(false);
@@ -86,7 +88,7 @@ export default function AttendanceCalendar({
       adminService
         .getEmployees()
         .then((res) => {
-          setEmployeeList(res.employees);
+          setEmployeeList(res.employees || []);
         })
         .catch(() => {});
     }
@@ -103,18 +105,22 @@ export default function AttendanceCalendar({
       const startDate = `${year}-${monthStr}-${startDay}`;
       const endDate = `${year}-${monthStr}-${String(lastDate).padStart(2, '0')}`;
 
+      const targetEmp = activeEmpId || user?.id || '';
+
       const [logRes, holRes, leaveRes] = await Promise.all([
         apiFetch<{ records: AttendanceRecord[] }>(
-          `/attendance/log?startDate=${startDate}&endDate=${endDate}&employeeId=${activeEmpId}`
+          `/attendance/log?startDate=${startDate}&endDate=${endDate}&employeeId=${targetEmp}`
         ).catch(() => ({ records: [] })),
         apiFetch<{ holidays: Holiday[] }>('/settings/holidays').catch(() => ({ holidays: [] })),
         apiFetch<{ leaveRequests: LeaveRequest[] }>('/employee/leave-requests').catch(() => ({ leaveRequests: [] })),
       ]);
 
-      const fetchedRecords: AttendanceRecord[] = logRes.records || [];
+      const fetchedRecords: AttendanceRecord[] = (logRes.records || []).filter(
+        (r: AttendanceRecord) => !targetEmp || r.employeeId === targetEmp
+      );
       const fetchedHolidays: Holiday[] = holRes.holidays || [];
       const fetchedLeaves: LeaveRequest[] = (leaveRes.leaveRequests || []).filter(
-        (l: LeaveRequest) => l.status === 'approved' && (!activeEmpId || l.employeeId === activeEmpId)
+        (l: LeaveRequest) => l.status === 'approved' && (!targetEmp || l.employeeId === targetEmp)
       );
 
       setRecords(fetchedRecords);
@@ -125,7 +131,7 @@ export default function AttendanceCalendar({
     } finally {
       setLoading(false);
     }
-  }, [currentYear, currentMonth, activeEmpId]);
+  }, [currentYear, currentMonth, activeEmpId, user?.id]);
 
   useEffect(() => {
     loadMonthData();
@@ -170,6 +176,7 @@ export default function AttendanceCalendar({
   let presentCount = 0;
   let lateCount = 0;
   let leaveCount = 0;
+  let holidayCount = 0;
   let absentCount = 0;
   let totalMinutesWorked = 0;
 
@@ -193,8 +200,8 @@ export default function AttendanceCalendar({
 
     let type = 'future';
     let label = '';
-    let bgColor = '#FAF7F2';
-    let borderColor = '#E8E3DD';
+    let bgColor = '#FFFFFF';
+    let borderColor = '#E2E8F0';
     let textColor = '#2B2620';
     let badgeText = '';
 
@@ -203,23 +210,23 @@ export default function AttendanceCalendar({
       if (st === 'on_time' || st === 'in_buffer') {
         type = 'present';
         label = 'Present';
-        bgColor = '#DCFCE7';
+        bgColor = '#DCFCE7'; // Light Green
         borderColor = '#86EFAC';
         textColor = '#14532D';
-        badgeText = st === 'in_buffer' ? 'Buffer' : 'Present';
+        badgeText = st === 'in_buffer' ? 'In Buffer' : 'On Time';
         presentCount++;
       } else if (st === 'late' || st === 'half_day') {
         type = 'late';
         label = st === 'half_day' ? 'Half Day' : 'Late';
-        bgColor = '#FEF3C7';
+        bgColor = '#FEF3C7'; // Light Amber
         borderColor = '#FCD34D';
         textColor = '#78350F';
-        badgeText = st === 'half_day' ? 'Half' : 'Late';
+        badgeText = st === 'half_day' ? 'Half Day' : 'Late';
         lateCount++;
       } else if (st === 'on_leave') {
         type = 'leave';
         label = 'Leave';
-        bgColor = '#E0E7FF';
+        bgColor = '#E0E7FF'; // Light Blue/Indigo
         borderColor = '#A5B4FC';
         textColor = '#3730A3';
         badgeText = 'Leave';
@@ -227,7 +234,7 @@ export default function AttendanceCalendar({
       } else if (st === 'absent') {
         type = 'absent';
         label = 'Absent';
-        bgColor = '#FEE2E2';
+        bgColor = '#FEE2E2'; // Light Red
         borderColor = '#FCA5A5';
         textColor = '#7F1D1D';
         badgeText = 'Absent';
@@ -250,22 +257,31 @@ export default function AttendanceCalendar({
       bgColor = '#E0E7FF';
       borderColor = '#A5B4FC';
       textColor = '#3730A3';
-      badgeText = 'Leave';
+      badgeText = leaveMatch.leaveType;
       leaveCount++;
     } else if (holidayMatch) {
       type = 'holiday';
       label = holidayMatch.name || holidayMatch.label;
       bgColor = '#F3E8FF';
       borderColor = '#D8B4FE';
-      textColor = '#6B21A8';
-      badgeText = 'Holiday';
+      textColor = '#581C87';
+      badgeText = holidayMatch.name || holidayMatch.label || 'Holiday';
+      holidayCount++;
     } else if (isWeeklyOff) {
-      type = 'off';
+      type = 'weekly_off';
       label = 'Weekly Off';
-      bgColor = '#F3F4F6';
-      borderColor = '#E5E7EB';
-      textColor = '#6B7280';
-      badgeText = 'Off';
+      bgColor = '#F1F5F9';
+      borderColor = '#CBD5E1';
+      textColor = '#475569';
+      badgeText = 'Sunday Off';
+      holidayCount++;
+    } else if (isToday) {
+      type = 'today_pending';
+      label = 'Today';
+      bgColor = '#FFFBEB';
+      borderColor = '#F59E0B';
+      textColor = '#92400E';
+      badgeText = 'Pending Punch';
     } else if (!isFuture) {
       type = 'absent';
       label = 'Absent';
@@ -329,6 +345,10 @@ export default function AttendanceCalendar({
   };
 
   const activeEmpObj = employeeList.find((e) => e.id === activeEmpId);
+  const activeEmpName = activeEmpObj
+    ? `${activeEmpObj.firstName} ${activeEmpObj.lastName}`
+    : (user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Employee');
+  const displayEmpId = activeEmpId || user?.id || '';
 
   return (
     <View style={styles.container}>
@@ -341,11 +361,11 @@ export default function AttendanceCalendar({
           >
             <Ionicons name="people-outline" size={18} color={Colors.primary} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.empSelectorLabel}>Viewing Calendar For:</Text>
+              <Text style={styles.empSelectorLabel}>Viewing Attendance Calendar For:</Text>
               <Text style={styles.empSelectorValue} numberOfLines={1}>
                 {activeEmpObj
-                  ? `${activeEmpObj.firstName} ${activeEmpObj.lastName} (${activeEmpObj.department})`
-                  : 'Me (Admin)'}
+                  ? `${activeEmpObj.firstName} ${activeEmpObj.lastName} (${activeEmpObj.id})`
+                  : `Me (${user?.firstName || 'Admin'})`}
               </Text>
             </View>
             <Ionicons name="chevron-down" size={18} color={Colors.textSecondary} />
@@ -353,280 +373,312 @@ export default function AttendanceCalendar({
         </Card>
       )}
 
-      {/* Month Navigation & Mode Switcher Header Card */}
-      <Card style={styles.headerCard}>
-        <View style={styles.navRow}>
-          <TouchableOpacity
-            style={styles.navArrow}
-            onPress={handlePrevMonth}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
-          </TouchableOpacity>
-
-          <View style={styles.monthTitleBox}>
+      {/* TOP CARD: Overview, Subtitle, Navigation, KPI Metrics & Legend */}
+      <Card style={styles.overviewCard}>
+        {/* Header Row: Calendar Icon, Month/Year Title, Employee Subtitle */}
+        <View style={styles.headerInfoRow}>
+          <Ionicons name="calendar-outline" size={26} color="#F59E0B" style={{ marginTop: 2 }} />
+          <View style={{ flex: 1 }}>
             <Text style={styles.monthTitle}>
               {MONTH_NAMES[currentMonth]} {currentYear}
             </Text>
+            <Text style={styles.employeeSubtitle}>
+              Employee: <Text style={styles.employeeSubtitleBold}>{activeEmpName}</Text> ({displayEmpId})
+            </Text>
           </View>
+        </View>
 
+        {/* Navigation Buttons Row: < Prev Month, Current Month, Next Month > */}
+        <View style={styles.navButtonsRow}>
           <TouchableOpacity
-            style={styles.navArrow}
-            onPress={handleNextMonth}
+            style={styles.navBtn}
+            onPress={handlePrevMonth}
             activeOpacity={0.7}
           >
-            <Ionicons name="chevron-forward" size={20} color={Colors.textPrimary} />
+            <Text style={styles.navBtnText}>‹ Prev Month</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.todayButton}
+            style={styles.navBtn}
             onPress={handleGoToday}
             activeOpacity={0.7}
           >
-            <Text style={styles.todayButtonText}>Today</Text>
+            <Text style={styles.navBtnText}>Current Month</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.navBtn}
+            onPress={handleNextMonth}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.navBtnText}>Next Month ›</Text>
           </TouchableOpacity>
         </View>
 
-        {/* View Mode Toggle: Calendar Grid vs List */}
-        <View style={styles.viewToggleRow}>
-          <TouchableOpacity
-            style={[
-              styles.toggleTab,
-              viewMode === 'calendar' && styles.toggleTabActive,
-            ]}
-            onPress={() => setViewMode('calendar')}
-          >
-            <Ionicons
-              name="grid-outline"
-              size={15}
-              color={viewMode === 'calendar' ? '#FFFFFF' : Colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.toggleTabText,
-                viewMode === 'calendar' && styles.toggleTabTextActive,
-              ]}
-            >
-              Calendar Grid
-            </Text>
-          </TouchableOpacity>
+        {/* 6-KPI Analytics Metrics Grid */}
+        <View style={styles.kpiGrid}>
+          {/* 1. Present */}
+          <View style={[styles.kpiCard, { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' }]}>
+            <Text style={[styles.kpiHeaderLabel, { color: '#14532D' }]}>PRESENT</Text>
+            <Text style={[styles.kpiValue, { color: '#15803D' }]}>{presentCount}</Text>
+            <Text style={[styles.kpiSubLabel, { color: '#166534' }]}>Days On Time</Text>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.toggleTab, viewMode === 'list' && styles.toggleTabActive]}
-            onPress={() => setViewMode('list')}
-          >
-            <Ionicons
-              name="list-outline"
-              size={15}
-              color={viewMode === 'list' ? '#FFFFFF' : Colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.toggleTabText,
-                viewMode === 'list' && styles.toggleTabTextActive,
-              ]}
-            >
-              Logs List
-            </Text>
-          </TouchableOpacity>
+          {/* 2. Late / Buffer */}
+          <View style={[styles.kpiCard, { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }]}>
+            <Text style={[styles.kpiHeaderLabel, { color: '#78350F' }]}>LATE / BUFFER</Text>
+            <Text style={[styles.kpiValue, { color: '#B45309' }]}>{lateCount}</Text>
+            <Text style={[styles.kpiSubLabel, { color: '#92400E' }]}>Days</Text>
+          </View>
+
+          {/* 3. Leaves */}
+          <View style={[styles.kpiCard, { backgroundColor: '#E0E7FF', borderColor: '#A5B4FC' }]}>
+            <Text style={[styles.kpiHeaderLabel, { color: '#3730A3' }]}>LEAVES</Text>
+            <Text style={[styles.kpiValue, { color: '#4F46E5' }]}>{leaveCount}</Text>
+            <Text style={[styles.kpiSubLabel, { color: '#4338CA' }]}>Approved Days</Text>
+          </View>
+
+          {/* 4. Off / Holiday */}
+          <View style={[styles.kpiCard, { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE' }]}>
+            <Text style={[styles.kpiHeaderLabel, { color: '#581C87' }]}>OFF / HOLIDAY</Text>
+            <Text style={[styles.kpiValue, { color: '#7E22CE' }]}>{holidayCount}</Text>
+            <Text style={[styles.kpiSubLabel, { color: '#6B21A8' }]}>Weekly Offs</Text>
+          </View>
+
+          {/* 5. Absent */}
+          <View style={[styles.kpiCard, { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }]}>
+            <Text style={[styles.kpiHeaderLabel, { color: '#7F1D1D' }]}>ABSENT</Text>
+            <Text style={[styles.kpiValue, { color: '#B91C1C' }]}>{absentCount}</Text>
+            <Text style={[styles.kpiSubLabel, { color: '#991B1B' }]}>Unrecorded</Text>
+          </View>
+
+          {/* 6. Worked Time */}
+          <View style={[styles.kpiCard, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+            <Text style={[styles.kpiHeaderLabel, { color: '#64748B' }]}>WORKED TIME</Text>
+            <Text style={[styles.kpiValue, { color: '#1E293B' }]}>{totalHoursWorked}h</Text>
+            <Text style={[styles.kpiSubLabel, { color: '#64748B' }]}>Total Recorded</Text>
+          </View>
+        </View>
+
+        {/* Color Legend Bar */}
+        <View style={styles.legendContainer}>
+          <Text style={styles.legendTitle}>Color Legend:</Text>
+          <View style={styles.legendItemsWrap}>
+            <View style={styles.legendEntry}>
+              <View style={[styles.legendBox, { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' }]} />
+              <Text style={styles.legendEntryText}>Present / On Time (Light Green)</Text>
+            </View>
+            <View style={styles.legendEntry}>
+              <View style={[styles.legendBox, { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }]} />
+              <Text style={styles.legendEntryText}>Late / Half Day (Amber)</Text>
+            </View>
+            <View style={styles.legendEntry}>
+              <View style={[styles.legendBox, { backgroundColor: '#E0E7FF', borderColor: '#A5B4FC' }]} />
+              <Text style={styles.legendEntryText}>Leave (Blue)</Text>
+            </View>
+            <View style={styles.legendEntry}>
+              <View style={[styles.legendBox, { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE' }]} />
+              <Text style={styles.legendEntryText}>Holiday / Sunday (Purple)</Text>
+            </View>
+            <View style={styles.legendEntry}>
+              <View style={[styles.legendBox, { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }]} />
+              <Text style={styles.legendEntryText}>Absent (Light Red)</Text>
+            </View>
+          </View>
         </View>
       </Card>
 
-      {/* Monthly Metrics KPI Strip */}
-      <View style={styles.metricsStrip}>
-        <View style={[styles.metricCard, { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' }]}>
-          <Text style={[styles.metricCount, { color: '#14532D' }]}>{presentCount}</Text>
-          <Text style={[styles.metricLabel, { color: '#14532D' }]}>Present</Text>
-        </View>
-        <View style={[styles.metricCard, { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }]}>
-          <Text style={[styles.metricCount, { color: '#78350F' }]}>{lateCount}</Text>
-          <Text style={[styles.metricLabel, { color: '#78350F' }]}>Late</Text>
-        </View>
-        <View style={[styles.metricCard, { backgroundColor: '#E0E7FF', borderColor: '#A5B4FC' }]}>
-          <Text style={[styles.metricCount, { color: '#3730A3' }]}>{leaveCount}</Text>
-          <Text style={[styles.metricLabel, { color: '#3730A3' }]}>Leave</Text>
-        </View>
-        <View style={[styles.metricCard, { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }]}>
-          <Text style={[styles.metricCount, { color: '#7F1D1D' }]}>{absentCount}</Text>
-          <Text style={[styles.metricLabel, { color: '#7F1D1D' }]}>Absent</Text>
-        </View>
-        <View style={[styles.metricCard, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-          <Text style={[styles.metricCount, { color: '#334155' }]}>{totalHoursWorked}h</Text>
-          <Text style={[styles.metricLabel, { color: '#334155' }]}>Hours</Text>
-        </View>
-      </View>
+      {/* BOTTOM CARD: Interactive Calendar Matrix Grid */}
+      <Card style={styles.gridCard}>
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Loading {MONTH_NAMES[currentMonth]} attendance records...</Text>
+          </View>
+        ) : (
+          <View>
+            {/* Scroll Hint */}
+            <View style={styles.scrollHintRow}>
+              <Ionicons name="swap-horizontal" size={14} color={Colors.textSecondary} />
+              <Text style={styles.scrollHintText}>Swipe horizontally to see all 7 days (Sun - Sat)</Text>
+            </View>
 
-      {/* Main Content Area */}
-      {loading ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading attendance matrix...</Text>
-        </View>
-      ) : viewMode === 'calendar' ? (
-        /* Calendar Grid View */
-        <Card style={styles.calendarCard}>
-          {/* Days of Week Header */}
-          <View style={styles.weekHeader}>
-            {DAYS_OF_WEEK.map((day) => (
-              <View key={day} style={styles.weekCol}>
-                <Text
-                  style={[
-                    styles.weekColText,
-                    day === 'Sun' && { color: Colors.danger },
-                  ]}
-                >
-                  {day}
-                </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flexGrow: 0 }}>
+              <View style={{ minWidth: CALENDAR_MIN_WIDTH, paddingBottom: 6 }}>
+                {/* Days of Week Header */}
+                <View style={styles.weekHeaderRow}>
+                  {DAYS_OF_WEEK.map((day, idx) => (
+                    <View key={day} style={styles.weekHeaderCell}>
+                      <Text
+                        style={[
+                          styles.weekHeaderText,
+                          idx === 0 && { color: '#EF4444' }, // SUN in Red
+                        ]}
+                      >
+                        {day.toUpperCase()}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Matrix Day Cells */}
+                <View style={styles.matrixGrid}>
+                  {/* Leading blank offset cells */}
+                  {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
+                    <View key={`empty-${idx}`} style={styles.dayCellEmpty} />
+                  ))}
+
+                  {/* Actual Month Days */}
+                  {Array.from({ length: totalDaysInMonth }).map((_, idx) => {
+                    const dayNum = idx + 1;
+                    const info = dayDetailsMap[dayNum];
+                    if (!info) return null;
+
+                    return (
+                      <TouchableOpacity
+                        key={`day-${dayNum}`}
+                        style={[
+                          styles.dayCell,
+                          {
+                            backgroundColor: info.bgColor,
+                            borderColor: info.isToday ? '#F59E0B' : info.borderColor,
+                            borderWidth: info.isToday ? 2 : 1,
+                          },
+                        ]}
+                        onPress={() => setSelectedDay(info)}
+                        activeOpacity={0.75}
+                      >
+                        {/* Day Number and Today Pill */}
+                        <View style={styles.dayCellTopRow}>
+                          <Text
+                            style={[
+                              styles.dayCellNumber,
+                              { color: info.textColor },
+                              info.isToday && { color: '#92400E', fontWeight: '900' },
+                            ]}
+                          >
+                            {dayNum}
+                          </Text>
+
+                          {info.isToday && (
+                            <View style={styles.todayPill}>
+                              <Text style={styles.todayPillText}>TODAY</Text>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Status Label & Times */}
+                        <View style={styles.dayCellBody}>
+                          {info.type === 'present' && (
+                            <View>
+                              <Text style={[styles.dayStatusLabel, { color: '#15803D' }]} numberOfLines={1}>
+                                ✓ {info.badgeText}
+                              </Text>
+                              <Text style={[styles.dayTimeLabel, { color: '#166534' }]}>
+                                In: {info.record?.punchInTime?.slice(0, 5) || '10:00'}
+                              </Text>
+                              {info.record?.punchOutTime && (
+                                <Text style={[styles.dayTimeLabel, { color: '#166534' }]}>
+                                  Out: {info.record.punchOutTime.slice(0, 5)}
+                                </Text>
+                              )}
+                            </View>
+                          )}
+
+                          {info.type === 'late' && (
+                            <View>
+                              <Text style={[styles.dayStatusLabel, { color: '#B45309' }]} numberOfLines={1}>
+                                ⚠️ {info.badgeText}
+                              </Text>
+                              <Text style={[styles.dayTimeLabel, { color: '#92400E' }]}>
+                                In: {info.record?.punchInTime?.slice(0, 5) || '10:45'}
+                              </Text>
+                              {info.record?.punchOutTime && (
+                                <Text style={[styles.dayTimeLabel, { color: '#92400E' }]}>
+                                  Out: {info.record.punchOutTime.slice(0, 5)}
+                                </Text>
+                              )}
+                            </View>
+                          )}
+
+                          {info.type === 'leave' && (
+                            <View>
+                              <Text style={[styles.dayStatusLabel, { color: '#4338CA' }]} numberOfLines={1}>
+                                🏖 Leave
+                              </Text>
+                              <Text style={[styles.dayTimeLabel, { color: '#4338CA' }]} numberOfLines={1}>
+                                {info.badgeText}
+                              </Text>
+                            </View>
+                          )}
+
+                          {info.type === 'holiday' && (
+                            <View>
+                              <Text style={[styles.dayStatusLabel, { color: '#581C87' }]} numberOfLines={1}>
+                                🎉 Holiday
+                              </Text>
+                              <Text style={[styles.dayTimeLabel, { color: '#581C87' }]} numberOfLines={1}>
+                                {info.holiday?.name || info.holiday?.label || 'Holiday'}
+                              </Text>
+                            </View>
+                          )}
+
+                          {info.type === 'weekly_off' && (
+                            <View>
+                              <Text style={[styles.dayStatusLabel, { color: '#475569' }]} numberOfLines={1}>
+                                🌴 Weekly Off
+                              </Text>
+                            </View>
+                          )}
+
+                          {info.type === 'absent' && (
+                            <View>
+                              <Text style={[styles.dayStatusLabel, { color: '#DC2626' }]} numberOfLines={1}>
+                                ✕ Absent
+                              </Text>
+                            </View>
+                          )}
+
+                          {info.type === 'today_pending' && !info.record && (
+                            <View>
+                              <Text style={[styles.dayStatusLabel, { color: '#D97706' }]} numberOfLines={1}>
+                                Pending Punch
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            ))}
+            </ScrollView>
           </View>
+        )}
+      </Card>
 
-          {/* Matrix Cells */}
-          <View style={styles.matrix}>
-            {/* Blank leading offsets */}
-            {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
-              <View key={`empty-${idx}`} style={styles.cellEmpty} />
-            ))}
-
-            {/* Actual day cells */}
-            {Array.from({ length: totalDaysInMonth }).map((_, idx) => {
-              const dayNum = idx + 1;
-              const info = dayDetailsMap[dayNum];
-              if (!info) return null;
-
-              return (
-                <TouchableOpacity
-                  key={`day-${dayNum}`}
-                  style={[
-                    styles.cell,
-                    {
-                      backgroundColor: info.bgColor,
-                      borderColor: info.isToday ? Colors.primaryDark : info.borderColor,
-                      borderWidth: info.isToday ? 2 : 1,
-                    },
-                  ]}
-                  onPress={() => setSelectedDay(info)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.cellDayNum,
-                      { color: info.textColor },
-                      info.isToday && { fontWeight: '900' },
-                    ]}
-                  >
-                    {dayNum}
-                  </Text>
-
-                  {info.badgeText ? (
-                    <Text
-                      style={[styles.cellBadgeText, { color: info.textColor }]}
-                      numberOfLines={1}
-                    >
-                      {info.badgeText}
-                    </Text>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Color Legend */}
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#86EFAC' }]} />
-              <Text style={styles.legendText}>Present</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#FCD34D' }]} />
-              <Text style={styles.legendText}>Late / Half</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#A5B4FC' }]} />
-              <Text style={styles.legendText}>Leave</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#D8B4FE' }]} />
-              <Text style={styles.legendText}>Holiday</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#FCA5A5' }]} />
-              <Text style={styles.legendText}>Absent</Text>
-            </View>
-          </View>
-        </Card>
-      ) : (
-        /* Detailed List View */
-        <Card style={styles.listCard}>
-          {Array.from({ length: totalDaysInMonth })
-            .map((_, idx) => dayDetailsMap[idx + 1])
-            .filter((info) => info && !info.isFuture)
-            .reverse()
-            .map((info) => (
-              <TouchableOpacity
-                key={`list-${info.day}`}
-                style={styles.listRow}
-                onPress={() => setSelectedDay(info)}
-              >
-                <View style={styles.listDateCol}>
-                  <Text style={styles.listDayNum}>{info.day}</Text>
-                  <Text style={styles.listMonthName}>
-                    {MONTH_NAMES[currentMonth].slice(0, 3)}
-                  </Text>
-                </View>
-
-                <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                  <Text style={styles.listLabelText}>{info.label}</Text>
-                  {info.record ? (
-                    <Text style={styles.listPunchSubtext}>
-                      In: {formatTime(info.record.punchInTime)} • Out:{' '}
-                      {formatTime(info.record.punchOutTime)}
-                    </Text>
-                  ) : info.holiday ? (
-                    <Text style={styles.listPunchSubtext}>
-                      🎉 {info.holiday.name}
-                    </Text>
-                  ) : info.isWeeklyOff ? (
-                    <Text style={styles.listPunchSubtext}>Weekly Holiday</Text>
-                  ) : (
-                    <Text style={[styles.listPunchSubtext, { color: Colors.danger }]}>
-                      No punch registered
-                    </Text>
-                  )}
-                </View>
-
-                <View
-                  style={[
-                    styles.listStatusBadge,
-                    { backgroundColor: info.bgColor, borderColor: info.borderColor },
-                  ]}
-                >
-                  <Text style={[styles.listStatusText, { color: info.textColor }]}>
-                    {info.badgeText || info.label}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-        </Card>
-      )}
-
-      {/* Day Details Modal */}
+      {/* DAY DETAIL & ADMIN OVERRIDE MODAL */}
       {selectedDay && (
         <Modal
           visible={!!selectedDay}
-          transparent
-          animationType="slide"
+          animationType="fade"
+          transparent={true}
           onRequestClose={() => setSelectedDay(null)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalDateText}>
-                    {formatDate(selectedDay.dateStr)}
+                  <Text style={styles.modalDateTitle}>
+                    {selectedDay.dateObj.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
                   </Text>
-                  <Text style={styles.modalDaySubtext}>
-                    Day {selectedDay.day} • {selectedDay.label}
+                  <Text style={styles.modalDateSub}>
+                    {selectedDay.isToday ? 'Today' : selectedDay.label}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -637,208 +689,160 @@ export default function AttendanceCalendar({
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ maxHeight: 420 }}>
+              {/* Day Punch Information */}
+              <View style={styles.modalDetailsBox}>
+                <View style={styles.modalDetailRow}>
+                  <Text style={styles.modalDetailLabel}>Status:</Text>
+                  <Text style={[styles.modalDetailValue, { color: selectedDay.textColor, fontWeight: '800' }]}>
+                    {selectedDay.badgeText || selectedDay.label}
+                  </Text>
+                </View>
+
                 {selectedDay.record ? (
-                  <View style={styles.recordDetailBox}>
-                    <View style={styles.punchTimesRow}>
-                      <View style={styles.punchBox}>
-                        <Text style={styles.punchBoxLabel}>PUNCH IN</Text>
-                        <Text style={styles.punchBoxVal}>
-                          {formatTime(selectedDay.record.punchInTime)}
-                        </Text>
-                        {selectedDay.record.punchInLocation && (
-                          <Text style={styles.punchLocText} numberOfLines={1}>
-                            📍 {selectedDay.record.punchInLocation}
-                          </Text>
-                        )}
-                        {selectedDay.record.punchInPhotoUrl && (
-                          <Image
-                            source={{ uri: selectedDay.record.punchInPhotoUrl }}
-                            style={styles.modalSelfie}
-                          />
-                        )}
-                      </View>
-
-                      <View style={styles.punchBox}>
-                        <Text style={styles.punchBoxLabel}>PUNCH OUT</Text>
-                        <Text style={styles.punchBoxVal}>
-                          {formatTime(selectedDay.record.punchOutTime)}
-                        </Text>
-                        {selectedDay.record.punchOutLocation && (
-                          <Text style={styles.punchLocText} numberOfLines={1}>
-                            📍 {selectedDay.record.punchOutLocation}
-                          </Text>
-                        )}
-                        {selectedDay.record.punchOutPhotoUrl && (
-                          <Image
-                            source={{ uri: selectedDay.record.punchOutPhotoUrl }}
-                            style={styles.modalSelfie}
-                          />
-                        )}
-                      </View>
-                    </View>
-
-                    {selectedDay.record.lateReason && (
-                      <View style={styles.reasonBox}>
-                        <Text style={styles.reasonLabel}>Late Reason:</Text>
-                        <Text style={styles.reasonText}>
-                          {selectedDay.record.lateReason}
-                        </Text>
-                      </View>
-                    )}
-
-                    {selectedDay.record.isWfh && (
-                      <View style={[styles.reasonBox, { backgroundColor: '#EFF6FF' }]}>
-                        <Text style={[styles.reasonLabel, { color: '#1D4ED8' }]}>
-                          Remote Work (WFH):
-                        </Text>
-                        <Text style={[styles.reasonText, { color: '#1E40AF' }]}>
-                          Verified Remote Attendance
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                ) : selectedDay.holiday ? (
-                  <View style={styles.infoBanner}>
-                    <Ionicons name="sparkles" size={24} color="#6B21A8" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.infoBannerTitle}>
-                        {selectedDay.holiday.name}
+                  <>
+                    <View style={styles.modalDetailRow}>
+                      <Text style={styles.modalDetailLabel}>Punch In:</Text>
+                      <Text style={styles.modalDetailValue}>
+                        {selectedDay.record.punchInTime || 'N/A'}
                       </Text>
-                      <Text style={styles.infoBannerSub}>Official Company Holiday</Text>
                     </View>
-                  </View>
-                ) : selectedDay.isWeeklyOff ? (
-                  <View style={styles.infoBanner}>
-                    <Ionicons name="cafe-outline" size={24} color="#4B5563" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.infoBannerTitle}>Weekly Off</Text>
-                      <Text style={styles.infoBannerSub}>Scheduled Weekend Rest</Text>
+                    <View style={styles.modalDetailRow}>
+                      <Text style={styles.modalDetailLabel}>Punch Out:</Text>
+                      <Text style={styles.modalDetailValue}>
+                        {selectedDay.record.punchOutTime || 'N/A'}
+                      </Text>
                     </View>
-                  </View>
+                    {selectedDay.record.locationName && (
+                      <View style={styles.modalDetailRow}>
+                        <Text style={styles.modalDetailLabel}>Location:</Text>
+                        <Text style={styles.modalDetailValue} numberOfLines={2}>
+                          {selectedDay.record.locationName}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Verification Photo Preview if exists */}
+                    {(selectedDay.record.punchInPhotoUrl || selectedDay.record.punchInPhoto) && (
+                      <View style={{ marginTop: 10, alignItems: 'center' }}>
+                        <Text style={[styles.modalDetailLabel, { marginBottom: 6, alignSelf: 'flex-start' }]}>
+                          Verification Selfie:
+                        </Text>
+                        <Image
+                          source={{
+                            uri: selectedDay.record.punchInPhoto?.startsWith('data:')
+                              ? selectedDay.record.punchInPhoto
+                              : getPhotoUrl(selectedDay.record.punchInPhotoUrl || selectedDay.record.punchInPhoto),
+                          }}
+                          style={styles.modalSelfiePreview}
+                        />
+                      </View>
+                    )}
+                  </>
                 ) : (
-                  <View style={[styles.infoBanner, { backgroundColor: '#FEE2E2' }]}>
-                    <Ionicons name="alert-circle-outline" size={24} color="#DC2626" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.infoBannerTitle, { color: '#991B1B' }]}>
-                        Absent / No Punch
-                      </Text>
-                      <Text style={[styles.infoBannerSub, { color: '#B91C1C' }]}>
-                        No punch recorded on this working day.
-                      </Text>
-                    </View>
+                  <View style={{ paddingVertical: 10 }}>
+                    <Text style={{ fontSize: 13, color: Colors.textSecondary, fontStyle: 'italic' }}>
+                      {selectedDay.holiday
+                        ? `Official Holiday: ${selectedDay.holiday.name || selectedDay.holiday.label}`
+                        : selectedDay.leave
+                        ? `Approved Leave: ${selectedDay.leave.leaveType}`
+                        : selectedDay.isWeeklyOff
+                        ? 'Company Weekly Off (Sunday)'
+                        : selectedDay.isToday
+                        ? 'No punch recorded yet today.'
+                        : 'Unrecorded past working day (Marked Absent).'}
+                    </Text>
                   </View>
                 )}
+              </View>
 
-                {/* Admin Override Controls */}
-                {isAdmin && !readOnly && (
-                  <View style={styles.adminActionSection}>
-                    <Text style={styles.adminSectionTitle}>ADMIN OVERRIDE</Text>
-                    <View style={styles.overrideButtonsRow}>
-                      <TouchableOpacity
-                        style={[styles.overrideBtn, { backgroundColor: '#DCFCE7' }]}
-                        onPress={() =>
-                          handleQuickOverride('on_time', '10:00', '18:30')
-                        }
-                        disabled={savingOverride}
-                      >
-                        <Text style={[styles.overrideBtnText, { color: '#14532D' }]}>
-                          ✓ Mark Present
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.overrideBtn, { backgroundColor: '#FEF3C7' }]}
-                        onPress={() =>
-                          handleQuickOverride('half_day', '13:00', '18:30')
-                        }
-                        disabled={savingOverride}
-                      >
-                        <Text style={[styles.overrideBtnText, { color: '#78350F' }]}>
-                          ½ Mark Half Day
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.overrideBtn, { backgroundColor: '#E0E7FF' }]}
-                        onPress={() =>
-                          handleQuickOverride('on_leave', '00:00', '00:00')
-                        }
-                        disabled={savingOverride}
-                      >
-                        <Text style={[styles.overrideBtnText, { color: '#3730A3' }]}>
-                          ✉ Mark Leave
-                        </Text>
-                      </TouchableOpacity>
+              {/* Admin Quick Override Actions */}
+              {isAdmin && !readOnly && (
+                <View style={styles.adminActionArea}>
+                  <Text style={styles.adminActionTitle}>Admin Quick Actions:</Text>
+                  {savingOverride ? (
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  ) : (
+                    <View style={styles.adminActionButtonsGrid}>
+                      <Button
+                        title="Mark Present"
+                        onPress={() => handleQuickOverride('on_time', '10:00:00', '18:30:00')}
+                        variant="primary"
+                        size="small"
+                      />
+                      <Button
+                        title="Mark Half Day"
+                        onPress={() => handleQuickOverride('half_day', '10:00:00', '14:00:00')}
+                        variant="secondary"
+                        size="small"
+                      />
+                      <Button
+                        title="Mark Leave"
+                        onPress={() => handleQuickOverride('on_leave', '', '')}
+                        variant="outline"
+                        size="small"
+                      />
                     </View>
-                  </View>
-                )}
-              </ScrollView>
-
-              <Button
-                title="Close"
-                onPress={() => setSelectedDay(null)}
-                variant="secondary"
-                style={{ marginTop: 12 }}
-              />
+                  )}
+                </View>
+              )}
             </View>
           </View>
         </Modal>
       )}
 
       {/* Admin Employee Picker Modal */}
-      {showEmpPicker && (
+      {isAdmin && (
         <Modal
           visible={showEmpPicker}
-          transparent
-          animationType="fade"
+          animationType="slide"
+          transparent={true}
           onRequestClose={() => setShowEmpPicker(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxHeight: '80%' }]}>
-              <Text style={styles.pickerModalTitle}>Select Employee Calendar</Text>
-              <ScrollView>
+            <View style={[styles.modalCard, { maxHeight: '75%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalDateTitle}>Select Employee</Text>
+                <TouchableOpacity onPress={() => setShowEmpPicker(false)}>
+                  <Ionicons name="close" size={24} color={Colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ marginTop: 10 }}>
                 <TouchableOpacity
                   style={[
-                    styles.pickerItem,
-                    activeEmpId === (user?.id || '') && styles.pickerItemActive,
+                    styles.pickerRow,
+                    activeEmpId === user?.id && styles.pickerRowActive,
                   ]}
                   onPress={() => {
                     setActiveEmpId(user?.id || '');
                     setShowEmpPicker(false);
                   }}
                 >
-                  <Text style={styles.pickerItemName}>👤 Me (Admin)</Text>
+                  <Text style={styles.pickerRowName}>👤 Me (Admin)</Text>
+                  <Text style={styles.pickerRowSub}>{user?.email}</Text>
                 </TouchableOpacity>
 
                 {employeeList.map((emp) => (
                   <TouchableOpacity
                     key={emp.id}
                     style={[
-                      styles.pickerItem,
-                      activeEmpId === emp.id && styles.pickerItemActive,
+                      styles.pickerRow,
+                      activeEmpId === emp.id && styles.pickerRowActive,
                     ]}
                     onPress={() => {
                       setActiveEmpId(emp.id);
                       setShowEmpPicker(false);
                     }}
                   >
-                    <Text style={styles.pickerItemName}>
-                      {emp.firstName} {emp.lastName}
+                    <Text style={styles.pickerRowName}>
+                      {emp.firstName} {emp.lastName} ({emp.id})
                     </Text>
-                    <Text style={styles.pickerItemDept}>
-                      {emp.id} • {emp.department}
+                    <Text style={styles.pickerRowSub}>
+                      {emp.department} • {emp.designation || 'Staff'}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-
-              <Button
-                title="Cancel"
-                onPress={() => setShowEmpPicker(false)}
-                variant="outline"
-                style={{ marginTop: 12 }}
-              />
             </View>
           </View>
         </Modal>
@@ -849,11 +853,11 @@ export default function AttendanceCalendar({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    gap: 14,
   },
   adminBarCard: {
     padding: 10,
-    marginBottom: 10,
+    backgroundColor: Colors.surface,
   },
   empSelectorButton: {
     flexDirection: 'row',
@@ -866,382 +870,307 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   empSelectorValue: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
-  headerCard: {
-    padding: 12,
-    marginBottom: 10,
+  overviewCard: {
+    padding: 16,
+    backgroundColor: Colors.surface,
+    gap: 14,
   },
-  navRow: {
+  headerInfoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  navArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: Colors.surfaceSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  monthTitleBox: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   monthTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: Colors.textPrimary,
-  },
-  todayButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: Colors.primaryTint,
-  },
-  todayButtonText: {
-    fontSize: 12,
+    fontSize: 19,
     fontWeight: '800',
-    color: Colors.primaryDark,
+    color: '#1E1B18',
   },
-  viewToggleRow: {
+  employeeSubtitle: {
+    fontSize: 12,
+    color: '#75706A',
+    marginTop: 2,
+  },
+  employeeSubtitleBold: {
+    fontWeight: '700',
+    color: '#1E1B18',
+  },
+  navButtonsRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceSubtle,
-    borderRadius: 8,
-    padding: 3,
-    gap: 4,
+    gap: 8,
+    alignItems: 'center',
   },
-  toggleTab: {
+  navBtn: {
     flex: 1,
-    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7,
-    borderRadius: 6,
-    gap: 6,
   },
-  toggleTabActive: {
-    backgroundColor: Colors.primaryDark,
-  },
-  toggleTabText: {
-    fontSize: 12,
+  navBtnText: {
+    fontSize: 11.5,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: '#334155',
   },
-  toggleTabTextActive: {
-    color: '#FFFFFF',
-  },
-  metricsStrip: {
+  kpiGrid: {
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  metricCard: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+  kpiCard: {
+    width: '31.5%',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  metricCount: {
-    fontSize: 15,
+  kpiHeaderLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  kpiValue: {
+    fontSize: 18,
     fontWeight: '900',
+    marginBottom: 2,
   },
-  metricLabel: {
-    fontSize: 10,
+  kpiSubLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  legendContainer: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+    padding: 10,
+    gap: 8,
+  },
+  legendTitle: {
+    fontSize: 11,
     fontWeight: '700',
-    marginTop: 2,
+    color: '#64748B',
+  },
+  legendItemsWrap: {
+    gap: 6,
+  },
+  legendEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendBox: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    borderWidth: 1,
+  },
+  legendEntryText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  gridCard: {
+    padding: 12,
+    backgroundColor: Colors.surface,
   },
   loadingBox: {
     padding: 40,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
   loadingText: {
-    marginTop: 10,
     fontSize: 13,
     color: Colors.textSecondary,
-    fontWeight: '600',
   },
-  calendarCard: {
-    padding: 10,
-    marginBottom: 20,
-  },
-  weekHeader: {
+  scrollHintRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    paddingBottom: 6,
   },
-  weekCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  weekColText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: Colors.textSecondary,
-  },
-  matrix: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  cellEmpty: {
-    width: `${100 / 7}%`,
-    height: 52,
-  },
-  cell: {
-    width: `${100 / 7}%`,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 6,
-    padding: 2,
-    marginVertical: 2,
-  },
-  cellDayNum: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  cellBadgeText: {
-    fontSize: 8,
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 14,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    justifyContent: 'center',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
+  scrollHintText: {
     fontSize: 11,
     color: Colors.textSecondary,
-    fontWeight: '600',
+    fontStyle: 'italic',
   },
-  listCard: {
-    padding: 10,
-    marginBottom: 20,
-  },
-  listRow: {
+  weekHeaderRow: {
     flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  weekHeaderCell: {
+    width: CELL_WIDTH,
     alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  listDateCol: {
-    width: 44,
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceSubtle,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  listDayNum: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: Colors.textPrimary,
-  },
-  listMonthName: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-  },
-  listLabelText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-  },
-  listPunchSubtext: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  listStatusBadge: {
-    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
   },
-  listStatusText: {
-    fontSize: 10,
+  weekHeaderText: {
+    fontSize: 11,
     fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  matrixGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    width: CALENDAR_MIN_WIDTH,
+  },
+  dayCellEmpty: {
+    width: CELL_WIDTH,
+    height: CELL_HEIGHT,
+    backgroundColor: 'transparent',
+    opacity: 0.1,
+  },
+  dayCell: {
+    width: CELL_WIDTH,
+    minHeight: CELL_HEIGHT,
+    padding: 6,
+    borderRadius: 8,
+    justifyContent: 'space-between',
+  },
+  dayCellTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dayCellNumber: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  todayPill: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  todayPillText: {
+    color: '#FFFFFF',
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  dayCellBody: {
+    marginTop: 4,
+    gap: 2,
+  },
+  dayStatusLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
+  dayTimeLabel: {
+    fontSize: 8.5,
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
-  modalContent: {
+  modalCard: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    padding: 18,
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 420,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    paddingBottom: 10,
+    paddingBottom: 12,
   },
-  modalDateText: {
-    fontSize: 17,
-    fontWeight: '900',
+  modalDateTitle: {
+    fontSize: 16,
+    fontWeight: '800',
     color: Colors.textPrimary,
   },
-  modalDaySubtext: {
+  modalDateSub: {
     fontSize: 12,
     color: Colors.textSecondary,
-    fontWeight: '600',
     marginTop: 2,
   },
   modalCloseBtn: {
     padding: 4,
   },
-  recordDetailBox: {
-    gap: 12,
+  modalDetailsBox: {
+    paddingVertical: 14,
+    gap: 8,
   },
-  punchTimesRow: {
+  modalDetailRow: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  punchBox: {
-    flex: 1,
-    backgroundColor: Colors.surfaceSubtle,
-    borderRadius: 10,
-    padding: 12,
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  punchBoxLabel: {
-    fontSize: 10,
-    fontWeight: '800',
+  modalDetailLabel: {
+    fontSize: 13,
     color: Colors.textSecondary,
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
-  punchBoxVal: {
-    fontSize: 18,
-    fontWeight: '900',
+  modalDetailValue: {
+    fontSize: 13,
     color: Colors.textPrimary,
-    marginVertical: 4,
+    fontWeight: '700',
   },
-  punchLocText: {
-    fontSize: 10,
-    color: Colors.textSecondary,
-  },
-  modalSelfie: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginTop: 8,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  reasonBox: {
-    backgroundColor: '#FFFBEB',
-    padding: 10,
-    borderRadius: 8,
+  modalSelfiePreview: {
+    width: 140,
+    height: 140,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: Colors.border,
   },
-  reasonLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#92400E',
-  },
-  reasonText: {
-    fontSize: 12,
-    color: '#78350F',
-    marginTop: 2,
-  },
-  infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    backgroundColor: '#F3E8FF',
-    borderRadius: 10,
-  },
-  infoBannerTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#6B21A8',
-  },
-  infoBannerSub: {
-    fontSize: 12,
-    color: '#7E22CE',
-    marginTop: 2,
-  },
-  adminActionSection: {
-    marginTop: 14,
+  adminActionArea: {
+    marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+    gap: 8,
   },
-  adminSectionTitle: {
-    fontSize: 11,
+  adminActionTitle: {
+    fontSize: 12,
     fontWeight: '800',
     color: Colors.textSecondary,
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    textTransform: 'uppercase',
   },
-  overrideButtonsRow: {
+  adminActionButtonsGrid: {
     flexDirection: 'row',
     gap: 8,
   },
-  overrideBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  overrideBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  pickerModalTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: Colors.textPrimary,
-    marginBottom: 12,
-  },
-  pickerItem: {
+  pickerRow: {
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  pickerItemActive: {
-    backgroundColor: Colors.primaryTint,
-    borderRadius: 6,
+  pickerRowActive: {
+    backgroundColor: Colors.surfaceSubtle,
+    borderRadius: 8,
   },
-  pickerItemName: {
+  pickerRowName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
-  pickerItemDept: {
-    fontSize: 11,
+  pickerRowSub: {
+    fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
   },

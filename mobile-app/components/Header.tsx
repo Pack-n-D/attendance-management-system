@@ -57,7 +57,7 @@ export function Header({
         )}
 
         {showLogo ? (
-          <Logo size="small" showSubtitle={false} />
+          <Logo size="small" />
         ) : (
           <View>
             {title ? <Text style={styles.title}>{title}</Text> : null}
